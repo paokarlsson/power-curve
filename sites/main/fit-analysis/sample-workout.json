@@ -1,0 +1,27 @@
+{
+  "id": "4x4-threshold",
+  "name": "4x4 Threshold",
+  "description": "Klassiska 4x4min intervaller på tröskel",
+  "segments": [
+    {
+      "type": "warmup",
+      "duration": 600,
+      "targetWatt": 150
+    },
+    {
+      "type": "interval",
+      "duration": 240,
+      "targetWatt": 250,
+      "repeat": 4,
+      "rest": {
+        "duration": 120,
+        "targetWatt": 100
+      }
+    },
+    {
+      "type": "cooldown",
+      "duration": 300,
+      "targetWatt": 120
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+# Main domain (olas-lab.se)
+{$DOMAIN} {
+    root * /srv/main
+    file_server
+}
+
+# Fit subdomain (fit.olas-lab.se) - Static files with simple links
+{$FIT_DOMAIN} {
+    root * /srv/main
+    file_server
+}

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Curve Plotter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-gray-900 to-gray-800 text-white min-h-screen">
+    <div class="container mx-auto p-6">
+        <h1 class="text-3xl font-bold mb-6 text-center">Power Curve Plotter</h1>
+
+        <!-- Input controls -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div class="bg-gray-800 p-4 rounded-lg">
+                <h3 class="text-lg font-semibold mb-3 text-yellow-400">📍 Punkt 1</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-300 mb-1">Watt</label>
+                        <input id="point1Watts" type="number" value="260"
+                               class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-yellow-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-300 mb-1">Sekunder</label>
+                        <input id="point1Seconds" type="number" value="210"
+                               class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-yellow-500 focus:outline-none">
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 p-4 rounded-lg">
+                <h3 class="text-lg font-semibold mb-3 text-blue-400">📍 Punkt 2</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-300 mb-1">Watt</label>
+                        <input id="point2Watts" type="number" value="220"
+                               class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-300 mb-1">Sekunder</label>
+                        <input id="point2Seconds" type="number" value="630"
+                               class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fitness Signature -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gradient-to-br from-red-600 to-red-700 p-4 rounded-lg text-center">
+                <div class="text-sm text-red-200 mb-1">PP (Peak Power)</div>
+                <div id="ppValue" class="text-2xl lg:text-3xl font-bold">400W</div>
+            </div>
+            <div class="bg-gradient-to-br from-orange-600 to-orange-700 p-4 rounded-lg text-center">
+                <div class="text-sm text-orange-200 mb-1">HIE (High Intensity Energy)</div>
+                <div id="hieValue" class="text-2xl lg:text-3xl font-bold">3.0kJ</div>
+                <div id="hieJoule" class="text-xs text-orange-200 mt-1">3000 joule</div>
+            </div>
+            <div class="bg-gradient-to-br from-green-600 to-green-700 p-4 rounded-lg text-center">
+                <div class="text-sm text-green-200 mb-1">TP (Threshold Power)</div>
+                <div id="tpValue" class="text-2xl lg:text-3xl font-bold">270W</div>
+            </div>
+            <div class="bg-gradient-to-br from-purple-600 to-purple-700 p-4 rounded-lg text-center">
+                <div class="text-sm text-purple-200 mb-1">Area (0-1h)</div>
+                <div id="areaValue" class="text-2xl lg:text-3xl font-bold">982kJ</div>
+                <div id="areaAvg" class="text-xs text-purple-200 mt-1">≈ 273W avg</div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-gray-800 p-6 rounded-lg">
+                <h3 class="text-xl font-semibold mb-4 text-center">Power vs Duration</h3>
+                <div class="relative h-80">
+                    <canvas id="powerChart"></canvas>
+                </div>
+            </div>
+            <div class="bg-gray-800 p-6 rounded-lg">
+                <h3 class="text-xl font-semibold mb-4 text-center">Work vs Duration (Linear)</h3>
+                <div class="relative h-80">
+                    <canvas id="workChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 bg-gray-800 p-4 rounded-lg text-sm text-gray-300">
+            <p class="font-semibold text-white mb-2">📊 Critical Power Model - Två perspektiv</p>
+            <p class="mb-2"><strong>Power vs Duration (vänster):</strong> Hyperbolisk kurva <span class="text-blue-400 font-mono">P(t) = TP + HIE/t</span></p>
+            <p class="mb-3"><strong>Work vs Duration (höger):</strong> Linjär kurva <span class="text-purple-400 font-mono">W(t) = TP × t + HIE</span></p>
+            <div id="pointInfo">
+                <p>• <span class="text-yellow-400">Punkt 1:</span> 400W @ 30s = 12.0kJ (12000J)</p>
+                <p>• <span class="text-blue-400">Punkt 2:</span> 280W @ 300s = 84.0kJ (84000J)</p>
+            </div>
+            <p class="mt-2">• <span class="text-green-400">TP (270W)</span> = Lutningen på den linjära kurvan</p>
+            <p>• <span class="text-orange-400">HIE (3.0kJ = 3000J)</span> = Y-intercept på den linjära kurvan</p>
+            <p>• <span class="text-purple-400">Area under kurvan (0-1h):</span> Total energi som kan produceras = 982kJ</p>
+        </div>
+    </div>
+
+    <script>
+        let powerChart, workChart;
+        let currentData = { tp: 0, hie: 0, pp: 0, area: 0 };
+
+        function formatTime(seconds) {
+            return `${Math.round(seconds)}s`;
+        }
+
+        function calculateCurve() {
+            const point1Watts = Number(document.getElementById('point1Watts').value);
+            const point1Seconds = Number(document.getElementById('point1Seconds').value);
+            const point2Watts = Number(document.getElementById('point2Watts').value);
+            const point2Seconds = Number(document.getElementById('point2Seconds').value);
+
+            const t1 = point1Seconds;
+            const t2 = point2Seconds;
+            const P1 = point1Watts;
+            const P2 = point2Watts;
+
+            const CP = (P1 * t1 - P2 * t2) / (t1 - t2);
+            const Wprime = (P1 - CP) * t1;
+            const PP = Math.max(P1, P2);
+
+            const T = 3600;
+            const t0 = 1;
+            const area = CP * (T - t0) + Wprime * Math.log(T / t0);
+
+            currentData = {
+                tp: Math.round(CP),
+                hie: Math.round(Wprime),
+                pp: Math.round(PP),
+                area: area
+            };
+
+            updateDisplayValues();
+            updateCharts();
+        }
+
+        function updateDisplayValues() {
+            document.getElementById('ppValue').textContent = `${currentData.pp}W`;
+            document.getElementById('hieValue').textContent = `${(currentData.hie / 1000).toFixed(1)}kJ`;
+            document.getElementById('hieJoule').textContent = `${currentData.hie.toFixed(0)} joule`;
+            document.getElementById('tpValue').textContent = `${currentData.tp}W`;
+            document.getElementById('areaValue').textContent = `${(currentData.area / 1000).toFixed(0)}kJ`;
+            document.getElementById('areaAvg').textContent = `≈ ${Math.round(currentData.area / 3600)}W avg`;
+
+            const p1w = Number(document.getElementById('point1Watts').value);
+            const p1s = Number(document.getElementById('point1Seconds').value);
+            const p2w = Number(document.getElementById('point2Watts').value);
+            const p2s = Number(document.getElementById('point2Seconds').value);
+
+            document.getElementById('pointInfo').innerHTML = `
+                <p>• <span class="text-yellow-400">Punkt 1:</span> ${p1w}W @ ${p1s}s = ${((p1w * p1s) / 1000).toFixed(1)}kJ (${p1w * p1s}J)</p>
+                <p>• <span class="text-blue-400">Punkt 2:</span> ${p2w}W @ ${p2s}s = ${((p2w * p2s) / 1000).toFixed(1)}kJ (${p2w * p2s}J)</p>
+            `;
+        }
+
+        function updateCharts() {
+            const p1w = Number(document.getElementById('point1Watts').value);
+            const p1s = Number(document.getElementById('point1Seconds').value);
+            const p2w = Number(document.getElementById('point2Watts').value);
+            const p2s = Number(document.getElementById('point2Seconds').value);
+
+            const minTime = Math.min(p1s, p2s);
+            const maxTime = Math.max(p1s, p2s);
+
+            const powerData = [];
+            const powerLabels = [];
+
+            const logMin = Math.log10(Math.max(1, minTime * 0.5));
+            const logMax = Math.log10(maxTime * 2);
+
+            for (let i = 0; i <= 100; i++) {
+                const logTime = logMin + (logMax - logMin) * (i / 100);
+                const t = Math.pow(10, logTime);
+                const power = currentData.tp + currentData.hie / t;
+
+                powerData.push(Math.round(power));
+                powerLabels.push(formatTime(Math.round(t)));
+            }
+
+            const workData = [];
+            const workLabels = [];
+            const minTimeLinear = minTime * 0.5;
+            const maxTimeLinear = maxTime * 1.5;
+
+            for (let i = 0; i <= 100; i++) {
+                const t = minTimeLinear + (maxTimeLinear - minTimeLinear) * (i / 100);
+                const work = (currentData.tp * t + currentData.hie) / 1000;
+
+                workData.push(work.toFixed(2));
+                workLabels.push(Math.round(t));
+            }
+
+            updatePowerChart(powerLabels, powerData);
+            updateWorkChart(workLabels, workData);
+        }
+
+        function updatePowerChart(labels, data) {
+            if (powerChart) {
+                powerChart.destroy();
+                powerChart = null;
+            }
+
+            const ctx = document.getElementById('powerChart');
+            if (!ctx) return;
+
+            // Generate scatter data for line chart
+            const lineData = [];
+            for (let i = 0; i < labels.length; i++) {
+                lineData.push({ x: i, y: data[i] });
+            }
+
+            // Add input points
+            const p1w = Number(document.getElementById('point1Watts').value);
+            const p1s = Number(document.getElementById('point1Seconds').value);
+            const p2w = Number(document.getElementById('point2Watts').value);
+            const p2s = Number(document.getElementById('point2Seconds').value);
+
+            powerChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Power Curve',
+                        data: data,
+                        borderColor: '#3B82F6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 3,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }, {
+                        label: `TP: ${currentData.tp}W`,
+                        data: new Array(labels.length).fill(currentData.tp),
+                        borderColor: '#10B981',
+                        borderDash: [5, 5],
+                        borderWidth: 2,
+                        fill: false,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#9CA3AF' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Duration',
+                                color: '#9CA3AF'
+                            },
+                            ticks: { color: '#9CA3AF' },
+                            grid: { color: '#374151' }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Power (W)',
+                                color: '#9CA3AF'
+                            },
+                            ticks: { color: '#9CA3AF' },
+                            grid: { color: '#374151' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateWorkChart(labels, data) {
+            if (workChart) {
+                workChart.destroy();
+                workChart = null;
+            }
+
+            const ctx = document.getElementById('workChart');
+            if (!ctx) return;
+
+            workChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Total Work',
+                        data: data,
+                        borderColor: '#A78BFA',
+                        backgroundColor: 'rgba(167, 139, 250, 0.1)',
+                        borderWidth: 3,
+                        fill: false,
+                        tension: 0.1,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#9CA3AF' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Duration (s)',
+                                color: '#9CA3AF'
+                            },
+                            ticks: { color: '#9CA3AF' },
+                            grid: { color: '#374151' }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Work (kJ)',
+                                color: '#9CA3AF'
+                            },
+                            ticks: { color: '#9CA3AF' },
+                            grid: { color: '#374151' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Event listeners
+        document.getElementById('point1Watts').addEventListener('input', calculateCurve);
+        document.getElementById('point1Seconds').addEventListener('input', calculateCurve);
+        document.getElementById('point2Watts').addEventListener('input', calculateCurve);
+        document.getElementById('point2Seconds').addEventListener('input', calculateCurve);
+
+        // Initialize
+        window.addEventListener('load', function() {
+            console.log('Page loaded, running initial calculation');
+            calculateCurve();
+        });
+
+        // Also run immediately
+        calculateCurve();
+    </script>
+</body>
+</html>

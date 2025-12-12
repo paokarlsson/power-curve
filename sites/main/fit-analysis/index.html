@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIT File Analysis - HR, Power & TSS</title>
+    <script src="module-loader.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>FIT File Analysis - HR, Power & TSS</h1>
+
+        <div class="upload-section">
+            <div class="form-group">
+                <label for="fitFile">Upload your .fit file or CSV timeline:</label>
+                <input type="file" id="fitFile" accept=".fit,.csv" class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label for="ftpInput">FTP (Functional Threshold Power):</label>
+                <input type="number" id="ftpInput" min="50" max="500" class="form-control">
+                <span class="unit-label">watts</span>
+            </div>
+
+            <div class="form-group">
+                <label for="maxPeakPowerInput">Max Peak Power:</label>
+                <input type="number" id="maxPeakPowerInput" min="100" max="3000" class="form-control">
+                <span class="unit-label">watts</span>
+            </div>
+
+            <div class="form-group">
+                <label for="powerRaiseInput">Power Exponent (NP calculation):</label>
+                <input type="number" id="powerRaiseInput" value="3.5" min="1" max="10" step="0.1" class="form-control">
+            </div>
+
+            <div class="form-group">
+                <button id="tssConfigBtn" type="button" class="config-btn">Configure TSS Windows</button>
+            </div>
+
+            <div class="form-group">
+                <button id="workoutConfigBtn" type="button" class="config-btn">Edit Workout Plan</button>
+            </div>
+        </div>
+
+        <div id="tssConfigPanel" class="config-panel" style="display: none;">
+            <h3>TSS Window Configuration</h3>
+            <div id="tssConfigList"></div>
+            <div class="config-actions">
+                <button id="addTssConfig" type="button" class="config-btn">Add New Window</button>
+                <button id="resetTssConfig" type="button" class="config-btn secondary">Reset to Defaults</button>
+                <button id="closeTssConfig" type="button" class="config-btn secondary">Close</button>
+            </div>
+        </div>
+
+        <div id="workoutConfigPanel" class="config-panel" style="display: none;">
+            <h3>Workout Plan Editor</h3>
+            <div class="workout-info">
+                <div class="form-group">
+                    <label for="workoutName">Workout Name:</label>
+                    <input type="text" id="workoutName" class="form-control" style="width: 200px;">
+                </div>
+                <div class="form-group">
+                    <label for="workoutDescription">Description:</label>
+                    <input type="text" id="workoutDescription" class="form-control" style="width: 300px;">
+                </div>
+            </div>
+            <div id="workoutSegmentsList"></div>
+            <div class="config-actions">
+                <button id="addWarmupSegment" type="button" class="config-btn">Add Warmup</button>
+                <button id="addIntervalSegment" type="button" class="config-btn">Add Interval</button>
+                <button id="addCooldownSegment" type="button" class="config-btn">Add Cooldown</button>
+                <br style="margin: 10px 0;">
+                <button id="exportWorkout" type="button" class="config-btn">Export JSON</button>
+                <input type="file" id="importWorkout" accept=".json" style="display: none;">
+                <button id="importWorkoutBtn" type="button" class="config-btn">Import JSON</button>
+                <button id="resetWorkout" type="button" class="config-btn secondary">Reset to Default</button>
+                <button id="closeWorkoutConfig" type="button" class="config-btn secondary">Close</button>
+            </div>
+        </div>
+
+        <div id="stats" class="stats" style="display: none;">
+            <div class="stat-box">
+                <div class="stat-label">Average HR</div>
+                <div class="stat-value" id="avgHR">--</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Max HR</div>
+                <div class="stat-value" id="maxHR">--</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Average Power</div>
+                <div class="stat-value" id="avgPower">--</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Max Power</div>
+                <div class="stat-value" id="maxPower">--</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Duration</div>
+                <div class="stat-value" id="duration">--</div>
+            </div>
+        </div>
+
+        <div id="tssStats" class="stats" style="display: none;">
+            <div class="stat-box" style="background: #fff3e0;">
+                <div class="stat-label">10s TSS (Sprint)</div>
+                <div class="stat-value" id="tssSprint" style="color: #f57c00;">--</div>
+            </div>
+            <div class="stat-box" style="background: #e8f5e8;">
+                <div class="stat-label">3m TSS (VO2max)</div>
+                <div class="stat-value" id="tssVo2Max" style="color: #388e3c;">--</div>
+            </div>
+            <div class="stat-box" style="background: #e3f2fd;">
+                <div class="stat-label">10m TSS (Threshold)</div>
+                <div class="stat-value" id="tssThreshold" style="color: #1976d2;">--</div>
+            </div>
+            <div class="stat-box" style="background: #f3e5f5;">
+                <div class="stat-label">30m TSS (Endurance)</div>
+                <div class="stat-value" id="tssEndurance" style="color: #7b1fa2;">--</div>
+            </div>
+        </div>
+
+        <div id="chartContainer">
+            <canvas id="hrChart"></canvas>
+        </div>
+
+        <div id="tssChartContainer" style="position: relative; height: 400px; margin-top: 30px; display: none;">
+            <h3 style="margin-bottom: 15px; color: #333;">TSS Accumulation Over Time</h3>
+            <canvas id="tssChart"></canvas>
+        </div>
+
+        <div id="workoutChartContainer" style="position: relative; height: 400px; margin-top: 30px;">
+            <h3 style="margin-bottom: 15px; color: #333;">Workout Plan</h3>
+            <canvas id="workoutChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Load all dependencies when page loads
+        document.addEventListener('DOMContentLoaded', loadAllDependencies);
+    </script>
+</body>
+
+</html>

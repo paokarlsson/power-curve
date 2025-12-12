@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intervall Optimizer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🚣 Intervall Optimizer</h1>
+        
+        <div class="input-section">
+            <h2 style="margin-bottom: 20px;">Fitness Signature</h2>
+            
+            <div class="input-group">
+                <label for="cp">CP (Critical Power / FTP)</label>
+                <div class="input-suffix" data-suffix="W">
+                    <input type="number" id="cp" value="200" min="50" max="500">
+                </div>
+            </div>
+            
+            <div class="input-group">
+                <label for="wprime">W' (Anaerob Kapacitet)</label>
+                <div class="input-suffix" data-suffix="kJ">
+                    <input type="number" id="wprime" value="15" min="5" max="40" step="0.5">
+                </div>
+            </div>
+            
+            <div class="input-group">
+                <label for="tau">τ (Tau - Återhämtningskonstant)</label>
+                <div class="input-suffix" data-suffix="sek">
+                    <input type="number" id="tau" value="180" min="60" max="600">
+                </div>
+            </div>
+            
+            <div class="input-group">
+                <label for="targetWbal">Mål W'bal efter slutfört pass</label>
+                <div class="input-suffix" data-suffix="%">
+                    <input type="number" id="targetWbal" value="30" min="10" max="50">
+                </div>
+            </div>
+            
+            <button onclick="calculate()">Beräkna Alla Intervallpass</button>
+        </div>
+        
+        <div class="results-section" id="results">
+            <!-- Results will be inserted here -->
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

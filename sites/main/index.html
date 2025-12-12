@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Curve Tools</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .nav-button {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .nav-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 to-gray-800 text-white min-h-screen">
+    <div class="container mx-auto p-6">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold mb-4">Power Curve Tools</h1>
+            <p class="text-xl text-gray-300 mb-8">En samling verktyg för analys av träningsdata och prestation</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <a href="power-curve/" class="nav-button bg-gradient-to-br from-blue-700 to-blue-800 p-8 rounded-lg cursor-pointer">
+                <h3 class="text-2xl font-bold mb-4 text-blue-300">📊 Power Curve Plotter</h3>
+                <p class="text-gray-300 mb-4">Analysera din power curve med Critical Power Model. Beräkna TP, HIE och PP från två datapunkter.</p>
+                <div class="flex flex-wrap gap-2">
+                    <span class="bg-blue-600 px-3 py-1 rounded-full text-sm">Critical Power</span>
+                    <span class="bg-green-600 px-3 py-1 rounded-full text-sm">Real-time</span>
+                    <span class="bg-purple-600 px-3 py-1 rounded-full text-sm">Chart.js</span>
+                </div>
+            </a>
+
+            <a href="running/" class="nav-button bg-gradient-to-br from-green-700 to-green-800 p-8 rounded-lg cursor-pointer">
+                <h3 class="text-2xl font-bold mb-4 text-green-300">🏃 Running Performance</h3>
+                <p class="text-gray-300 mb-4">Analysera löpprestation med Critical Speed Model. Förutsäg tider för olika distanser.</p>
+                <div class="flex flex-wrap gap-2">
+                    <span class="bg-green-600 px-3 py-1 rounded-full text-sm">Critical Speed</span>
+                    <span class="bg-cyan-600 px-3 py-1 rounded-full text-sm">Race Prediction</span>
+                    <span class="bg-purple-600 px-3 py-1 rounded-full text-sm">Pace Calculator</span>
+                </div>
+            </a>
+
+            <a href="fit-analysis/" class="nav-button bg-gradient-to-br from-orange-700 to-orange-800 p-8 rounded-lg cursor-pointer">
+                <h3 class="text-2xl font-bold mb-4 text-orange-300">📈 FIT File Analysis</h3>
+                <p class="text-gray-300 mb-4">Analysera FIT-filer med HR, Power och TSS-beräkningar. Konfigurera träningspass.</p>
+                <div class="flex flex-wrap gap-2">
+                    <span class="bg-orange-600 px-3 py-1 rounded-full text-sm">FIT Files</span>
+                    <span class="bg-red-600 px-3 py-1 rounded-full text-sm">TSS</span>
+                    <span class="bg-yellow-600 px-3 py-1 rounded-full text-sm">Workout Plans</span>
+                </div>
+            </a>
+        </div>
+
+        <div class="mt-12 bg-gray-800 bg-opacity-50 p-6 rounded-lg">
+            <h3 class="text-xl font-semibold mb-4">Om verktygen</h3>
+            <p class="text-gray-300 mb-4">
+                Denna samling verktyg hjälper dig att analysera träningsdata och förstå din prestationsförmåga.
+                Alla verktyg använder vetenskapligt baserade modeller för att ge dig insikter i din träning.
+            </p>
+            <ul class="text-gray-300 list-disc list-inside space-y-2">
+                <li><strong>Critical Power Model:</strong> Analyserar cykelprestation baserat på två testpunkter</li>
+                <li><strong>Critical Speed Model:</strong> Förutsäger löptider baserat på testresultat</li>
+                <li><strong>FIT File Analysis:</strong> Detaljerad analys av träningsfiler med TSS-beräkningar</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

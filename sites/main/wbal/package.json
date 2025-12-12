@@ -1,0 +1,21 @@
+{
+  "name": "wbal",
+  "version": "1.0.0",
+  "description": "",
+  "main": "script.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "complexity-report": "^2.0.0-alpha",
+    "eslint": "^9.38.0",
+    "eslint-plugin-sonarjs": "^3.0.5",
+    "jscpd": "^4.0.5",
+    "jshint": "^2.13.6",
+    "sonarjs": "^0.2.0"
+  }
+}
