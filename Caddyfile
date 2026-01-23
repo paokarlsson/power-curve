@@ -9,3 +9,8 @@
     root * /srv/main
     file_server
 }
+
+{$KIM_DOMAIN} {
+    root * /srv/main/kim
+    file_server
+}

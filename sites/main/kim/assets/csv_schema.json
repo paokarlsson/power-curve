@@ -1,0 +1,416 @@
+{
+  "schema_name": "Tidrapportering Schema",
+  "schema_version": "1.0",
+  "description": "Datastruktur för tidrapporteringssystem med automatisk och manuell data",
+  "columns": [
+    {
+      "name": "PriStampedInOffline",
+      "display_name": "Stämplat IN Offline",
+      "type": "boolean",
+      "visible": false,
+      "category": "system",
+      "description": "Om instämpling skedde offline"
+    },
+    {
+      "name": "StampedUtOffline",
+      "display_name": "Stämplat UT Offline",
+      "type": "boolean",
+      "visible": false,
+      "category": "system",
+      "description": "Om utstämpling skedde offline"
+    },
+    {
+      "name": "Kundnummer",
+      "display_name": "Kundnummer",
+      "type": "number",
+      "visible": false,
+      "category": "customer",
+      "description": "Unikt kundnummer"
+    },
+    {
+      "name": "Kundnamn",
+      "display_name": "Kundnamn",
+      "type": "text",
+      "visible": true,
+      "category": "customer",
+      "description": "Kundens namn"
+    },
+    {
+      "name": "Projektnummer",
+      "display_name": "Projektnummer",
+      "type": "number",
+      "visible": false,
+      "category": "project",
+      "description": "Unikt projektnummer"
+    },
+    {
+      "name": "Projektnamn",
+      "display_name": "Projektnamn",
+      "type": "text",
+      "visible": true,
+      "category": "project",
+      "description": "Projektets namn"
+    },
+    {
+      "name": "Arbetsledare (projekt)",
+      "display_name": "Projektledare",
+      "type": "text",
+      "visible": false,
+      "category": "management",
+      "description": "Ansvarig projektledare"
+    },
+    {
+      "name": "Anställningsnr.",
+      "display_name": "Anställnings-nr",
+      "type": "text",
+      "visible": false,
+      "category": "employee",
+      "description": "Anställds ID-nummer"
+    },
+    {
+      "name": "Personal",
+      "display_name": "Personal",
+      "type": "text",
+      "visible": true,
+      "category": "employee",
+      "description": "Anställds namn"
+    },
+    {
+      "name": "Arbetsledare (personal)",
+      "display_name": "Personalledare",
+      "type": "text",
+      "visible": false,
+      "category": "management",
+      "description": "Ansvarig personalledare"
+    },
+    {
+      "name": "Starttid",
+      "display_name": "Starttid",
+      "type": "datetime",
+      "visible": true,
+      "category": "time",
+      "description": "Planerad starttid"
+    },
+    {
+      "name": "Sluttid",
+      "display_name": "Sluttid",
+      "type": "datetime",
+      "visible": false,
+      "category": "time",
+      "description": "Planerad sluttid"
+    },
+    {
+      "name": "Stämplat IN",
+      "display_name": "Stämplat IN",
+      "type": "datetime",
+      "visible": true,
+      "category": "time",
+      "description": "Faktisk instämplingstid"
+    },
+    {
+      "name": "Stämplat UT",
+      "display_name": "Stämplat UT",
+      "type": "datetime",
+      "visible": true,
+      "category": "time",
+      "description": "Faktisk utstämplingstid"
+    },
+    {
+      "name": "Tjänst/Typ",
+      "display_name": "Tjänstetyp",
+      "type": "enum",
+      "visible": false,
+      "category": "work",
+      "description": "Typ av arbetsuppgift",
+      "enum_values": ["Hemstäd Uppdrag Tim", "Kontorsstäd", "Fönsterputs", "Städning Uppdrag", "Hemstäd Tim"]
+    },
+    {
+      "name": "Fakt.typ",
+      "display_name": "Faktureringstyp",
+      "type": "enum",
+      "visible": false,
+      "category": "billing",
+      "description": "Typ av fakturering",
+      "enum_values": ["Arbetsorder", "Timpris", "Fast pris", "Ackord"]
+    },
+    {
+      "name": "Skillnad klockslag in",
+      "display_name": "Tidsskillnad IN",
+      "type": "number",
+      "visible": false,
+      "category": "deviation",
+      "description": "Skillnad mellan planerad och faktisk starttid (minuter)"
+    },
+    {
+      "name": "Skillnad klockslag ut",
+      "display_name": "Tidsskillnad UT",
+      "type": "number",
+      "visible": false,
+      "category": "deviation",
+      "description": "Skillnad mellan planerad och faktisk sluttid (minuter)"
+    },
+    {
+      "name": "Nogg. IN",
+      "display_name": "Noggrannhet IN",
+      "type": "decimal",
+      "visible": false,
+      "category": "gps",
+      "description": "GPS-noggrannhet vid instämpling (meter)"
+    },
+    {
+      "name": "Nogg. UT",
+      "display_name": "Noggrannhet UT",
+      "type": "decimal",
+      "visible": false,
+      "category": "gps",
+      "description": "GPS-noggrannhet vid utstämpling (meter)"
+    },
+    {
+      "name": "Skillnad position in",
+      "display_name": "Positionsskillnad IN",
+      "type": "decimal",
+      "visible": false,
+      "category": "gps",
+      "description": "Avstånd från förväntad position vid instämpling (meter)"
+    },
+    {
+      "name": "Skillnad position ut",
+      "display_name": "Positionsskillnad UT",
+      "type": "decimal",
+      "visible": false,
+      "category": "gps",
+      "description": "Avstånd från förväntad position vid utstämpling (meter)"
+    },
+    {
+      "name": "Skillnad längd",
+      "display_name": "Längdskillnad",
+      "type": "decimal",
+      "visible": false,
+      "category": "gps",
+      "description": "Total GPS-avvikelse (meter)"
+    },
+    {
+      "name": "Avvikelseorsak",
+      "display_name": "Avvikelseorsak",
+      "type": "enum",
+      "visible": false,
+      "category": "deviation",
+      "description": "Orsak till tidsavvikelse",
+      "enum_values": ["", "Glömde stämpla", "Teknisk störning", "Försenad ankomst"]
+    },
+    {
+      "name": "Stämplingsbeskrivning",
+      "display_name": "Beskrivning",
+      "type": "text",
+      "visible": false,
+      "category": "notes",
+      "description": "Extra beskrivning av stämpling"
+    },
+    {
+      "name": "Anställdes region",
+      "display_name": "Region",
+      "type": "text",
+      "visible": false,
+      "category": "location",
+      "description": "Anställds hemregion"
+    },
+    {
+      "name": "Längd stämpling",
+      "display_name": "Arbetstid",
+      "type": "number",
+      "visible": true,
+      "category": "time",
+      "description": "Total arbetstid (minuter)"
+    },
+    {
+      "name": "Avrundad arbetstid",
+      "display_name": "Avrundad arbetstid",
+      "type": "time",
+      "visible": false,
+      "category": "time",
+      "description": "Arbetstid avrundad till närmaste halvtimme uppåt (HH:MM format)"
+    },
+    {
+      "name": "Avrundad tid (minuter)",
+      "display_name": "Avrundad tid (min)",
+      "type": "number",
+      "visible": true,
+      "category": "time",
+      "description": "Arbetstid avrundad till närmaste halvtimme uppåt (minuter)"
+    },
+    {
+      "name": "Arbetsadress",
+      "display_name": "Arbetsadress",
+      "type": "address",
+      "visible": true,
+      "category": "location",
+      "description": "Adress för arbetsplatsen"
+    },
+    {
+      "name": "Avtalsbeskrivning",
+      "display_name": "Avtalsbeskrivning",
+      "type": "text",
+      "visible": false,
+      "category": "contract",
+      "description": "Beskrivning av avtal"
+    },
+    {
+      "name": "Manuellt utstämplad",
+      "display_name": "Manuell utstämpling",
+      "type": "boolean",
+      "visible": false,
+      "category": "system",
+      "description": "Om utstämpling gjordes manuellt"
+    },
+    {
+      "name": "Saknar position In",
+      "display_name": "Saknar GPS IN",
+      "type": "boolean",
+      "visible": false,
+      "category": "gps",
+      "description": "Om GPS-position saknas vid instämpling"
+    },
+    {
+      "name": "Saknar position Ut",
+      "display_name": "Saknar GPS UT",
+      "type": "boolean",
+      "visible": false,
+      "category": "gps",
+      "description": "Om GPS-position saknas vid utstämpling"
+    },
+    {
+      "name": "__uniqueId",
+      "display_name": "Unikt ID",
+      "type": "text",
+      "visible": false,
+      "category": "system",
+      "description": "Systemgenererat unikt ID för varje rad"
+    },
+    {
+      "name": "Antal KG tvätt",
+      "display_name": "KG Tvätt",
+      "type": "number",
+      "visible": true,
+      "category": "manual_data",
+      "description": "Manuellt inmatad mängd tvätt i kilogram"
+    },
+    {
+      "name": "Färdtid till kund",
+      "display_name": "Färdtid (min)",
+      "type": "number",
+      "visible": true,
+      "category": "manual_data",
+      "description": "Manuellt inmatad färdtid till kund i minuter"
+    },
+    {
+      "name": "Tvätt tid (min)",
+      "display_name": "Tvätt tid (min)",
+      "type": "number",
+      "visible": true,
+      "category": "calculated",
+      "description": "Beräknad tvättid baserat på KG tvätt (15 min per kg)"
+    },
+    {
+      "name": "Total tid inkl tillägg",
+      "display_name": "Total tid inkl tillägg",
+      "type": "number",
+      "visible": true,
+      "category": "calculated",
+      "description": "Arbetstid + färdtid + tvättid (minuter)"
+    },
+    {
+      "name": "Total avrundad tid",
+      "display_name": "Total avrundad tid",
+      "type": "time",
+      "visible": true,
+      "category": "calculated",
+      "description": "Total tid avrundad uppåt till närmaste halvtimme (HH:MM)"
+    },
+    {
+      "name": "Bearbetad",
+      "display_name": "Bearbetningsstatus",
+      "type": "enum",
+      "visible": false,
+      "category": "manual_data",
+      "description": "Status för manuell bearbetning av raden",
+      "enum_values": ["Untouched", "Touched", "Saved"]
+    }
+  ],
+  "categories": {
+    "customer": {
+      "name": "Kund",
+      "color": "#4CAF50",
+      "description": "Kundinformation"
+    },
+    "project": {
+      "name": "Projekt",
+      "color": "#2196F3",
+      "description": "Projektinformation"
+    },
+    "employee": {
+      "name": "Personal",
+      "color": "#FF9800",
+      "description": "Personalinformation"
+    },
+    "management": {
+      "name": "Ledning",
+      "color": "#9C27B0",
+      "description": "Lednings- och ansvarsinformation"
+    },
+    "time": {
+      "name": "Tid",
+      "color": "#F44336",
+      "description": "Tidsrelaterad data"
+    },
+    "work": {
+      "name": "Arbete",
+      "color": "#607D8B",
+      "description": "Arbetsuppgifter och tjänster"
+    },
+    "billing": {
+      "name": "Fakturering",
+      "color": "#795548",
+      "description": "Faktureringsinformation"
+    },
+    "location": {
+      "name": "Plats",
+      "color": "#009688",
+      "description": "Plats- och adressinformation"
+    },
+    "gps": {
+      "name": "GPS",
+      "color": "#FF5722",
+      "description": "GPS och positionering"
+    },
+    "deviation": {
+      "name": "Avvikelser",
+      "color": "#E91E63",
+      "description": "Tids- och systemavvikelser"
+    },
+    "system": {
+      "name": "System",
+      "color": "#9E9E9E",
+      "description": "Systeminformation"
+    },
+    "notes": {
+      "name": "Anteckningar",
+      "color": "#CDDC39",
+      "description": "Fria textfält och beskrivningar"
+    },
+    "contract": {
+      "name": "Avtal",
+      "color": "#3F51B5",
+      "description": "Avtalsinformation"
+    },
+    "manual_data": {
+      "name": "Manuell Data",
+      "color": "#00BCD4",
+      "description": "Manuellt inmatade värden för faktureringsunderlag"
+    },
+    "calculated": {
+      "name": "Beräknade värden",
+      "color": "#8BC34A",
+      "description": "Automatiskt beräknade värden baserat på andra fält"
+    }
+  }
+}
