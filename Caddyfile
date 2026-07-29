@@ -14,3 +14,9 @@
     root * /srv/main/kim
     file_server
 }
+
+# Kardborre (separate domain, not a subdomain of olas-lab.se)
+{$KARDBORRE_DOMAIN} {
+    root * /srv/kardborre
+    file_server
+}
