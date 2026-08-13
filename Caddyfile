@@ -20,3 +20,9 @@
     root * /srv/kardborre
     file_server
 }
+
+# Sing subdomain (sing.olas-lab.se) - Psalmspelaren
+{$SING_DOMAIN} {
+    root * /srv/sing
+    file_server
+}
