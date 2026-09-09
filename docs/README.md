@@ -19,8 +19,11 @@ Två sammanfattande dokument:
 
 - **[06 — Etablerat vs eget](06-etablerat-vs-eget.md)** — facit över vad som är etablerad
   vetenskap och vad som är egenuppfunnet. Läs den först om du bara läser en.
-- **[07 — Felkatalog](07-felkatalog.md)** — varje fel i detalj: vad koden gör, varför det är
-  fel, hur man återskapar det och hur stort det är. Alla siffror uppmätta genom att köra
+- **[07 — Felkatalog](07-felkatalog.md)** — översikt över samtliga fel med fil och rad, plus
+  full beskrivning av felen i `power-curve/` och `running/`.
+- **[08 — Fellista: wbal och fit-analysis](08-fellista-wbal-och-fit-analysis.md)** —
+  fristående arbetslista för de två beräkningsverktygen, där alla fel som tyst förvanskar
+  siffror eller ger felaktiga föreskrifter sitter. Alla siffror uppmätta genom att köra
   repots egen kod.
 
 ## Konventioner i dokumenten

@@ -21,15 +21,15 @@ när siffrorna jämförs med andra verktyg.
 | Fönsternamn `SPRINT` / `VO2_MAX` / `THRESHOLD` | **Egen – problematisk** | Antyder energisystem. Fönstret mäter tidsskala, inte system. Vilseledande. | [03](03-normalized-power-och-tss.md) §2 |
 | Exponenten som inställning | **Egen – rimlig** | 4 är etablerad default. Reglaget är utforskande, inte för produktionssiffror. | [03](03-normalized-power-och-tss.md) §3 |
 | Decimerad fönsterstegning | **Egen – rimlig** | Uppmätt effekt < 0,1 % och utan riktning. Sund optimering, inget fel. | [03](03-normalized-power-och-tss.md) §4a |
-| Täckningskrav 0,5 | **Egen – problematisk** | Absolut krav på 0,5 Hz, inte relativ täckning. Gles inspelning (smart recording) ger `N/A` överallt, utan förklaring. | [07](07-felkatalog.md) A2 |
+| Täckningskrav 0,5 | **Egen – problematisk** | Absolut krav på 0,5 Hz, inte relativ täckning. Gles inspelning (smart recording) ger `N/A` överallt, utan förklaring. | [08](08-fellista-wbal-och-fit-analysis.md#a2--täckningskravet-slår-ut-hela-analysen-vid-gles-inspelning) |
 | **0 W → 30 W** | **Egen – problematisk** | Behandlar frihjulning som sensorbortfall. **+12 % TSS** på ett pass med normal frihjulning. | [03](03-normalized-power-och-tss.md) §4d |
-| TSS-ackumuleringskurva | **Egen – problematisk** | Full omräkning var 30:e sekund, inte löpande summa. **Planar aldrig ut** (växer som √t): 1,6–3,7× för stort tillskott. Lutningen är det tolkbara. | [07](07-felkatalog.md) A3 |
+| TSS-ackumuleringskurva | **Egen – problematisk** | Full omräkning var 30:e sekund, inte löpande summa. **Planar aldrig ut** (växer som √t): 1,6–3,7× för stort tillskott. Lutningen är det tolkbara. | [08](08-fellista-wbal-och-fit-analysis.md#a3--tss-ackumuleringen-planar-aldrig-ut) |
 | W′bal: linjär tömning / exponentiell återfyllnad | **Etablerad** | Skiba 2012. Asymmetrin korrekt implementerad. | [04](04-wbal-och-intervalldesign.md) §1 |
 | τ som användarinput, default 180 s | **Egen – rimlig, optimistisk default** | Skibas anpassning ger typiskt 300–500+ s. | [04](04-wbal-och-intervalldesign.md) §2 |
 | Återhämtningsfaktor `(CP − viloeffekt)/CP` | **Egen – problematisk** | Rätt riktning, fel angreppspunkt. Ger felaktig asymptot: återhämtar aldrig fullt, oavsett vilotid. | [04](04-wbal-och-intervalldesign.md) §3 |
 | **Föreskriv effekt ur mål-W′bal istället för %FTP** | **Egen – rimlig, repots näst bästa idé** | Väger in reps, duration, vila och viloeffekt automatiskt. Rätt sätt att dosera intervaller. | [04](04-wbal-och-intervalldesign.md) §4 |
-| Binärsökning 105–150 % av CP | **Egen – problematisk** | Klipper tyst vid gränserna. Biter bara för `2×15 min`, som då föreskrivs som ogenomförbart (slut-W′bal −155 J). | [07](07-felkatalog.md) B1 |
-| Endast slut-W′bal begränsas | **Egen – problematisk** | Ingen kontroll av bottennivån. Pyramiderna underskattar djupet med 3,8–5,4 % av W′; vid τ < 145 s blir pass ogenomförbara utan markering (168 fall). | [07](07-felkatalog.md) B2 |
+| Binärsökning 105–150 % av CP | **Egen – problematisk** | Klipper tyst vid gränserna. Biter bara för `2×15 min`, som då föreskrivs som ogenomförbart (slut-W′bal −155 J). | [08](08-fellista-wbal-och-fit-analysis.md#b1--binärsökningen-klipper-tyst-vid-intervallgränserna) |
+| Endast slut-W′bal begränsas | **Egen – problematisk** | Ingen kontroll av bottennivån. Pyramiderna underskattar djupet med 3,8–5,4 % av W′; vid τ < 145 s blir pass ogenomförbara utan markering (168 fall). | [08](08-fellista-wbal-och-fit-analysis.md#b2--endast-sluttillståndet-kontrolleras-aldrig-bottennivån) |
 | Vilointensitet per passtyp (30–65 % av CP) | **Etablerad tränarpraxis** | Korrekt kalibrerad och elegant kopplad till återhämtningsmatematiken. | [04](04-wbal-och-intervalldesign.md) §6 |
 | Passtaxonomi anaerob/VO2max/tröskel | **Etablerad** | Standardindelning, rätt durationer. | [04](04-wbal-och-intervalldesign.md) §6 |
 | CP och FTP som utbytbara | **Egen – problematisk** | CP ligger typiskt över FTP. Överskattar W′-förbrukningen. | [04](04-wbal-och-intervalldesign.md) §7 |
@@ -59,28 +59,29 @@ avvikelsen diagnostisk, inte bara ett tal.
 
 ## De fem sakerna att fixa först
 
-Prioriterade efter hur mycket de påverkar de siffror verktygen faktiskt visar. Fullständig
-beskrivning av varje fel — mekanism, reproduktion och uppmätt storlek — finns i
-[07 — Felkatalog](07-felkatalog.md).
+Prioriterade efter hur mycket de påverkar de siffror verktygen faktiskt visar. Samtliga fem
+sitter i `wbal/` och `fit-analysis/` och beskrivs med fil, rad, mekanism, reproduktion och
+uppmätt storlek i [08 — Fellista: wbal och fit-analysis](08-fellista-wbal-och-fit-analysis.md);
+[07 — Felkatalog](07-felkatalog.md) ger översikten över alla fel.
 
-1. **Ta bort 30 W-golvet för nollor** ([07](07-felkatalog.md) A1).
+1. **Ta bort 30 W-golvet för nollor** ([08](08-fellista-wbal-och-fit-analysis.md#a1--frihjulning-bokförs-som-sensorbortfall)).
    Störst numerisk påverkan i hela repot: **+2 till +54 % TSS** beroende på hur mycket
    atleten frihjular. Eftersom felet växer med frihjulningen kan det inte kalibreras bort —
    det förvränger jämförelsen *mellan* pass, vilket är hela poängen med TSS.
-2. **Fixa täckningskravet** ([07](07-felkatalog.md) A2).
+2. **Fixa täckningskravet** ([08](08-fellista-wbal-och-fit-analysis.md#a2--täckningskravet-slår-ut-hela-analysen-vid-gles-inspelning)).
    Vid inspelning glesare än 0,5 Hz blir **samtliga** TSS-värden `N/A` utan förklaring.
    Det enda felet som yttrar sig som totalt bortfall i stället för en förskjuten siffra.
 3. **Begränsa bottennivån, inte bara slutvärdet, och varna vid klippning**
-   ([07](07-felkatalog.md) B1–B2). Verktyget föreskriver pass som enligt dess egen modell
+   ([08](08-fellista-wbal-och-fit-analysis.md#b1--binärsökningen-klipper-tyst-vid-intervallgränserna)–B2). Verktyget föreskriver pass som enligt dess egen modell
    är ogenomförbara, omarkerade.
-4. **Flytta återhämtningsfaktorn in i τ** ([07](07-felkatalog.md) B3).
+4. **Flytta återhämtningsfaktorn in i τ** ([08](08-fellista-wbal-och-fit-analysis.md#b3--återhämtningsfaktorn-sitter-på-fel-storhet)).
    Rättar asymptoten — i dag återhämtas förrådet aldrig fullt, oavsett vilotid — och därmed
    underskattningen av pass med långa vilor.
 5. **Byt "area under kurvan" mot `TP·3600 + HIE`** ([07](07-felkatalog.md) A4).
    Ersätter ett tal som är 12,3 % för högt och dessutom rör sig 10 % med en godtyckligt
    vald integrationsgräns.
 
-Därefter: relativa mål i passchemat ([07](07-felkatalog.md) D4), etiketten
+Därefter: relativa mål i passchemat ([08](08-fellista-wbal-och-fit-analysis.md#d4--passchemat-anger-absoluta-watt)), etiketten
 `30m TSS (Endurance)` för ett 30-**sekunders**fönster (C3), `PP`-rutan som inte visar en
 peak power (C1), fönsternamn som antyder energisystem (C2), `t₁ = t₂`-kontroll i
 effektverktyget (D1), kolliderande `displayKey` (D5) och oanropbar `Base TSS`-kodväg (D6).
