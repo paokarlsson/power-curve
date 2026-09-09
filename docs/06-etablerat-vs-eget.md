@@ -20,15 +20,16 @@ när siffrorna jämförs med andra verktyg.
 | **Fönsterlängden som fri parameter → TSS-spektrum** | **Egen – rimlig, repots bästa idé** | Mäter variabilitetens tidsskala. Skiljer pass som medeleffekt och konventionell TSS inte kan skilja. | [03](03-normalized-power-och-tss.md) §2 |
 | Fönsternamn `SPRINT` / `VO2_MAX` / `THRESHOLD` | **Egen – problematisk** | Antyder energisystem. Fönstret mäter tidsskala, inte system. Vilseledande. | [03](03-normalized-power-och-tss.md) §2 |
 | Exponenten som inställning | **Egen – rimlig** | 4 är etablerad default. Reglaget är utforskande, inte för produktionssiffror. | [03](03-normalized-power-och-tss.md) §3 |
-| Decimerad fönsterstegning | **Egen – rimlig** | Prestandakompromiss. Liten underskattning av NP för långa fönster. | [03](03-normalized-power-och-tss.md) §4a |
+| Decimerad fönsterstegning | **Egen – rimlig** | Uppmätt effekt < 0,1 % och utan riktning. Sund optimering, inget fel. | [03](03-normalized-power-och-tss.md) §4a |
+| Täckningskrav 0,5 | **Egen – problematisk** | Absolut krav på 0,5 Hz, inte relativ täckning. Gles inspelning (smart recording) ger `N/A` överallt, utan förklaring. | [07](07-felkatalog.md) A2 |
 | **0 W → 30 W** | **Egen – problematisk** | Behandlar frihjulning som sensorbortfall. **+12 % TSS** på ett pass med normal frihjulning. | [03](03-normalized-power-och-tss.md) §4d |
-| TSS-ackumuleringskurva | **Egen – rimlig, missförstås lätt** | Full omräkning var 30:e sekund, inte löpande summa. Kan sjunka. Lutningen är det tolkbara. | [03](03-normalized-power-och-tss.md) §5 |
+| TSS-ackumuleringskurva | **Egen – problematisk** | Full omräkning var 30:e sekund, inte löpande summa. **Planar aldrig ut** (växer som √t): 1,6–3,7× för stort tillskott. Lutningen är det tolkbara. | [07](07-felkatalog.md) A3 |
 | W′bal: linjär tömning / exponentiell återfyllnad | **Etablerad** | Skiba 2012. Asymmetrin korrekt implementerad. | [04](04-wbal-och-intervalldesign.md) §1 |
 | τ som användarinput, default 180 s | **Egen – rimlig, optimistisk default** | Skibas anpassning ger typiskt 300–500+ s. | [04](04-wbal-och-intervalldesign.md) §2 |
 | Återhämtningsfaktor `(CP − viloeffekt)/CP` | **Egen – problematisk** | Rätt riktning, fel angreppspunkt. Ger felaktig asymptot: återhämtar aldrig fullt, oavsett vilotid. | [04](04-wbal-och-intervalldesign.md) §3 |
 | **Föreskriv effekt ur mål-W′bal istället för %FTP** | **Egen – rimlig, repots näst bästa idé** | Väger in reps, duration, vila och viloeffekt automatiskt. Rätt sätt att dosera intervaller. | [04](04-wbal-och-intervalldesign.md) §4 |
-| Binärsökning 105–150 % av CP | **Egen – problematisk** | Klipper tyst vid gränserna. `2×15 min` föreskrivs till ett pass som inte går att genomföra. | [04](04-wbal-och-intervalldesign.md) §5a |
-| Endast slut-W′bal begränsas | **Egen – problematisk** | Ingen kontroll av intra-pass-minimum. Ogenomförbara pass rapporteras som lösta. | [04](04-wbal-och-intervalldesign.md) §5b |
+| Binärsökning 105–150 % av CP | **Egen – problematisk** | Klipper tyst vid gränserna. Biter bara för `2×15 min`, som då föreskrivs som ogenomförbart (slut-W′bal −155 J). | [07](07-felkatalog.md) B1 |
+| Endast slut-W′bal begränsas | **Egen – problematisk** | Ingen kontroll av bottennivån. Pyramiderna underskattar djupet med 3,8–5,4 % av W′; vid τ < 145 s blir pass ogenomförbara utan markering (168 fall). | [07](07-felkatalog.md) B2 |
 | Vilointensitet per passtyp (30–65 % av CP) | **Etablerad tränarpraxis** | Korrekt kalibrerad och elegant kopplad till återhämtningsmatematiken. | [04](04-wbal-och-intervalldesign.md) §6 |
 | Passtaxonomi anaerob/VO2max/tröskel | **Etablerad** | Standardindelning, rätt durationer. | [04](04-wbal-och-intervalldesign.md) §6 |
 | CP och FTP som utbytbara | **Egen – problematisk** | CP ligger typiskt över FTP. Överskattar W′-förbrukningen. | [04](04-wbal-och-intervalldesign.md) §7 |
@@ -58,25 +59,31 @@ avvikelsen diagnostisk, inte bara ett tal.
 
 ## De fem sakerna att fixa först
 
-Prioriterade efter hur mycket de påverkar de siffror verktygen faktiskt visar:
+Prioriterade efter hur mycket de påverkar de siffror verktygen faktiskt visar. Fullständig
+beskrivning av varje fel — mekanism, reproduktion och uppmätt storlek — finns i
+[07 — Felkatalog](07-felkatalog.md).
 
-1. **Ta bort 30 W-golvet för nollor** ([03](03-normalized-power-och-tss.md) §4d).
-   Störst numerisk påverkan i hela repot: **+12 % TSS** på normala pass, ojämnt fördelat
-   och därför omöjligt att kompensera bort.
-2. **Varna när binärsökningen klipper** ([04](04-wbal-och-intervalldesign.md) §5a).
-   Verktyget föreskriver just nu pass som inte går att genomföra, utan markering.
-   Lägg samtidigt till kravet `min(W′bal) > 0` (§5b).
-3. **Flytta återhämtningsfaktorn in i τ** ([04](04-wbal-och-intervalldesign.md) §3).
-   Rättar asymptoten och därmed underskattningen av pass med långa vilor.
-4. **Byt "area under kurvan" mot `TP·3600 + HIE`** ([01](01-critical-power.md) §4).
-   Ersätter en godtycklig storhet med en fysiologiskt tolkbar.
-5. **Relativa mål i passchemat** ([05](05-passmodellen.md) §4).
-   Gör pass återanvändbara mellan atleter och planerad TSS invariant mot FTP.
+1. **Ta bort 30 W-golvet för nollor** ([07](07-felkatalog.md) A1).
+   Störst numerisk påverkan i hela repot: **+2 till +54 % TSS** beroende på hur mycket
+   atleten frihjular. Eftersom felet växer med frihjulningen kan det inte kalibreras bort —
+   det förvränger jämförelsen *mellan* pass, vilket är hela poängen med TSS.
+2. **Fixa täckningskravet** ([07](07-felkatalog.md) A2).
+   Vid inspelning glesare än 0,5 Hz blir **samtliga** TSS-värden `N/A` utan förklaring.
+   Det enda felet som yttrar sig som totalt bortfall i stället för en förskjuten siffra.
+3. **Begränsa bottennivån, inte bara slutvärdet, och varna vid klippning**
+   ([07](07-felkatalog.md) B1–B2). Verktyget föreskriver pass som enligt dess egen modell
+   är ogenomförbara, omarkerade.
+4. **Flytta återhämtningsfaktorn in i τ** ([07](07-felkatalog.md) B3).
+   Rättar asymptoten — i dag återhämtas förrådet aldrig fullt, oavsett vilotid — och därmed
+   underskattningen av pass med långa vilor.
+5. **Byt "area under kurvan" mot `TP·3600 + HIE`** ([07](07-felkatalog.md) A4).
+   Ersätter ett tal som är 12,3 % för högt och dessutom rör sig 10 % med en godtyckligt
+   vald integrationsgräns.
 
-Mindre, men triviala att åtgärda: etiketten `30m TSS (Endurance)` för ett 30-**sekunders**
-fönster; `PP`-rutan som inte visar en peak power; avsaknaden av `t₁ = t₂`-kontroll i
-effektverktyget; oanropbar `Base TSS`-kodväg; kolliderande `displayKey` för
-egendefinierade fönster.
+Därefter: relativa mål i passchemat ([07](07-felkatalog.md) D4), etiketten
+`30m TSS (Endurance)` för ett 30-**sekunders**fönster (C3), `PP`-rutan som inte visar en
+peak power (C1), fönsternamn som antyder energisystem (C2), `t₁ = t₂`-kontroll i
+effektverktyget (D1), kolliderande `displayKey` (D5) och oanropbar `Base TSS`-kodväg (D6).
 
 ## Vad som saknas helt
 

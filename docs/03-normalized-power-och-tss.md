@@ -95,27 +95,31 @@ förutsätter 4.
 Fyra beslut i beräkningen avviker från standard och påverkar resultatet. Ingen av dem
 syns i gränssnittet.
 
-### (a) Decimerad fönsterstegning  **[Egen – rimlig]**
+### (a) Decimerad fönsterstegning  **[Egen – rimlig, mätt utan effekt]**
 
 Standard-NP flyttar fönstret **en sekund i taget**. Koden använder
 `steg = max(1, ⌊fönster/60⌋)`:
 
-| Fönster | Steglängd | Kommentar |
-|---|---|---|
-| 10 s, 30 s, 60 s | 1 s | identiskt med standard |
-| 180 s | 3 s | |
-| 600 s | 10 s | |
-| 1800 s | 30 s | |
+| Fönster | Steglängd | NP med kodens steg | NP med 1 s-steg | Skillnad |
+|---|---|---|---|---|
+| 10 s, 30 s, 60 s | 1 s | — | — | identiskt med standard |
+| 180 s | 3 s | 229,32 W | 229,26 W | +0,03 % |
+| 600 s | 10 s | 209,83 W | 209,83 W | 0,00 % |
+| 1800 s | 30 s | 210,01 W | 210,03 W | −0,01 % |
 
-En prestandakompromiss. Effekten är en liten **underskattning** av NP för långa fönster
-(färre positioner → mindre chans att träffa det hårdaste fönstret). Marginell i praktiken,
-men den finns.
+Mätt på ett realistiskt ojämnt 40-minuterspass är skillnaden under en tiondels procent och
+saknar riktning. En sund prestandaoptimering, inte ett fel.
 
-### (b) Täckningskrav 50 %  **[Egen – rimlig]**
+### (b) Täckningskrav 50 %  **[Egen – problematisk]**
 
-Ett fönster räknas bara om det innehåller minst `0,5 × fönsterlängd` datapunkter. För
-1 Hz-data är det harmlöst. För enheter med *smart recording* (variabel samplingsfrekvens)
-kastas fönster tyst, vilket kan tunna ut underlaget utan att användaren märker det.
+Ett fönster räknas bara om det innehåller minst `0,5 × fönsterlängd` datapunkter. Namnet
+antyder ett relativt täckningskrav, men villkoret är i praktiken ett **absolut krav på
+samplingsfrekvens: minst 0,5 punkter per sekund**.
+
+Vid inspelning glesare än var annan sekund — precis vad *smart recording* på Garmin- och
+Wahoo-enheter producerar — kastas **samtliga** fönster och alla TSS-värden blir `N/A`, utan
+förklaring. Det faller inte gradvis, det faller helt. Se
+[07 — Felkatalog, A2](07-felkatalog.md#a2--täckningskravet-slår-ut-hela-analysen-vid-gles-inspelning).
 
 ### (c) Fönstret måste rymmas i passet  **[Etablerad praxis]**
 
@@ -156,15 +160,21 @@ NP-beräkningen från passets början** fram till den tidpunkten.
 Detta är **inte** en löpande summa. Varje punkt är en fullständig omanpassning över hela
 prefixet, och det har en konsekvens som är lätt att missa:
 
-> Kurvan kan **sjunka**.
+> Kurvan **planar aldrig ut**.
 
-Eftersom `TSS = (t/3600) × (NP/FTP)² × 100` och NP räknas om över *hela* det hittills
-gångna passet, kan en hård tidig insats spädas ut av efterföljande lugn åkning. NP faller
-snabbare än `t` växer, och den ackumulerade TSS-kurvan går nedåt — trots att atleten
-fortsätter belasta sig. Det ser ut som en bugg men följer av definitionen.
+En hård insats tidigt i passet räknas om mot ett allt större underlag och fortsätter
+generera TSS-tillskott långt efter att den är över. Formellt beter sig NP över ett prefix
+som `NP ∝ n^(−1/4)` när effekten därefter är låg, vilket ger
+`TSS ∝ t · t^(−1/2) = √t` — kurvan växer som roten ur tiden, för alltid, även om atleten
+stannar helt.
 
-Det som *är* meningsfullt att läsa i kurvan är **lutningen**: den är stressintensiteten just
-då. Och med flera fönster ritade samtidigt syns exakt **när** i passet variabiliteten kom —
+Uppmätt på ett pass med 3 min på 450 W följt av 120 W (= 18 TSS/h) bokför verktyget
+**1,6–3,7 gånger** så stort tillskott som lugnkörningen är värd. Se
+[07 — Felkatalog, A3](07-felkatalog.md#a3--tss-ackumuleringen-planar-aldrig-ut) för
+mätserien.
+
+Kurvans absoluta nivå går alltså inte att tolka som ackumulerad dos. Det som *är*
+meningsfullt att läsa är **lutningen**: den är stressintensiteten just då. Och med flera fönster ritade samtidigt syns exakt **när** i passet variabiliteten kom —
 de korta fönstrens kurvor drar ifrån de långa precis vid intervallblocken. Det är
 information som ett sluttal aldrig kan ge.
 

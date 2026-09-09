@@ -15,8 +15,13 @@ härleds ur den. Verktygen är fyra olika sätt att komma åt eller använda sam
 | `wbal/` | Vilken effekt ska jag hålla i ett givet intervallpass? | CP, W′, τ | [04](04-wbal-och-intervalldesign.md) |
 | `fit-analysis/` (passeditorn) | Hur beskriver jag ett pass formellt? | passchema (JSON) | [05](05-passmodellen.md) |
 
-Sammanfattande facit över vad som är etablerad vetenskap och vad som är egenuppfunnet:
-**[06 — Etablerat vs eget](06-etablerat-vs-eget.md)**. Läs den först om du bara läser en.
+Två sammanfattande dokument:
+
+- **[06 — Etablerat vs eget](06-etablerat-vs-eget.md)** — facit över vad som är etablerad
+  vetenskap och vad som är egenuppfunnet. Läs den först om du bara läser en.
+- **[07 — Felkatalog](07-felkatalog.md)** — varje fel i detalj: vad koden gör, varför det är
+  fel, hur man återskapar det och hur stort det är. Alla siffror uppmätta genom att köra
+  repots egen kod.
 
 ## Konventioner i dokumenten
 

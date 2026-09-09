@@ -110,33 +110,55 @@ gäller här, om än inte helt trivialt: högre effekt ger djupare underskott, v
 Om lösningen ligger utanför 105–150 % av CP returneras **gränsvärdet utan varning**.
 Kört på defaultvärdena (CP 200 W, W′ 15 kJ, τ 180 s, mål 30 %):
 
-| Pass | Föreskrivet | % CP | W′bal vid slut | Status |
-|---|---|---|---|---|
-| 4×4 min | 218 W | 109 % | 4 323 J | ok (mål 4 500 J) |
-| 8×2 min | 221 W | 110 % | 4 411 J | ok |
-| 12×1 min | 233 W | 117 % | 4 601 J | ok |
-| 10×1 min | 244 W | 122 % | 4 574 J | ok |
-| 3×8 min | 210 W | **105 %** | 4 425 J | **klippt** |
-| 2×10 min | 210 W | **105 %** | 4 947 J | **klippt** |
-| **2×15 min** | 210 W | **105 %** | **−155 J** | **klippt — passet går inte att genomföra** |
+Kolumnen *sant svar* är lösningen med vidgat sökintervall (0,5–4 × CP):
+
+| Pass | Föreskrivet | % CP | W′bal vid slut | Sant svar | Status |
+|---|---|---|---|---|---|
+| 4×4 min | 218 W | 109 % | 4 323 J | 218 W | ok (mål 4 500 J) |
+| 8×2 min | 221 W | 110 % | 4 411 J | 221 W | ok |
+| 12×1 min | 233 W | 117 % | 4 601 J | 233 W | ok |
+| 10×1 min | 244 W | 122 % | 4 574 J | 244 W | ok |
+| 3×8 min | 210 W | **105 %** | 4 425 J | 210 W | klippt, men sammanfaller |
+| 4×6 min | 211 W | **105 %** | 4 219 J | 211 W | klippt, men sammanfaller |
+| 2×10 min | 210 W | **105 %** | 4 947 J | 210 W | klippt, men sammanfaller |
+| **2×15 min** | 210 W | **105 %** | **−155 J** | **207 W (103 %)** | **fel svar** |
+
+Klippningen **biter** bara när den sanna lösningen ligger utanför intervallet, och bland de
+20 mallarna gäller det enbart `2×15 min`. För de tre övriga sammanfaller gränsvärdet med
+det korrekta svaret — de är klippta men råkar ha rätt.
 
 `2×15 min` är det avslöjande fallet. Verktyget rekommenderar 210 W, men vid 210 W är
-förrådet **slut före passets slut** — W′bal går under noll, vilket betyder att atleten
+förrådet **slut före passets slut** — W′bal landar på −155 J, vilket betyder att atleten
 inte kan fullfölja. Rekommendationen visas ändå, i samma format och med samma auktoritet
 som de fungerande passen.
 
-**Läsregel tills detta är fixat:** ett resultat på exakt **105 %** eller **150 %** är inte ett
-svar — det är "ingen lösning i det tillåtna intervallet". För 105 % betyder det att passet
-är för krävande för den angivna signaturen; för 150 % att det är för lätt.
+**Läsregel tills detta är fixat:** ett resultat på exakt **105 %** eller **150 %** betyder
+att sökningen tog slut, inte nödvändigtvis att svaret är fel. Kontrollera det separat —
+det kan sammanfalla med rätt svar, eller vara ogenomförbart som `2×15 min`.
 
 ### (b) Bara sluttillståndet begränsas  **[Egen – problematisk]**
 
-Simuleringen kontrollerar enbart W′bal **vid passets slut**. Ingenting hindrar att förrådet
-går under noll mitt i passet och sedan återhämtar sig till målnivån. Ett sådant pass är
-inte genomförbart, men rapporteras som löst.
+Simuleringen kontrollerar enbart W′bal **vid passets slut**. För de flesta mallarna spelar
+det ingen roll — med lika långa arbetsintervall ligger bottennivån i slutet av sista
+repetitionen, så slutvärdet *är* minimum. Men i pyramiderna ligger det längsta arbetsblocket
+i mitten, och då inträffar bottennivån mitt i passet:
 
-**Fix:** villkoret ska vara på `min(W′bal)` över hela passet, inte på slutvärdet — eller,
-bättre, på båda: `min(W′bal) > 0` som genomförbarhetskrav, slutvärdet som doseringsmål.
+| Pass | Slut-W′bal | Lägsta W′bal | Skillnad |
+|---|---|---|---|
+| Pyramid 1-2-3-4-3-2-1 | 4 378 J | 3 812 J | 566 J = **3,8 % av W′** |
+| Pyramid 2-4-6-4-2 | 4 583 J | 3 771 J | 812 J = **5,4 % av W′** |
+
+Ber man om 30 % kvar får man alltså ned till ~25 % i botten, utan att det syns.
+
+Sänker användaren τ under ~145 s (tillåtet — gränssnittets minimum är 60 s) går bottennivån
+**under noll** medan slutvärdet fortfarande når målet. Passet ser då ut som en normal, ej
+klippt lösning på 110–120 % av CP men är ogenomförbart. En genomsökning av CP 150–350 W,
+W′ 6–30 kJ, τ 60–400 s och mål 10–30 % ger **168 sådana fall**, samtliga i de två
+pyramidmallarna. Se
+[07 — Felkatalog, B2](07-felkatalog.md#b2--endast-sluttillståndet-kontrolleras-aldrig-bottennivån).
+
+**Fix:** villkoret ska vara på båda — `min(W′bal) > 0` som genomförbarhetskrav, slutvärdet
+som doseringsmål. De mäter olika saker.
 
 ### (c) De föreskrivna effekterna är genomgående för låga
 
