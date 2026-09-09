@@ -119,7 +119,7 @@ samplingsfrekvens: minst 0,5 punkter per sekund**.
 Vid inspelning glesare än var annan sekund — precis vad *smart recording* på Garmin- och
 Wahoo-enheter producerar — kastas **samtliga** fönster och alla TSS-värden blir `N/A`, utan
 förklaring. Det faller inte gradvis, det faller helt. Se
-[07 — Felkatalog, A2](07-felkatalog.md#a2--täckningskravet-slår-ut-hela-analysen-vid-gles-inspelning).
+[FA-2 i fellistan för fit-analysis](10-fel-fit-analysis.md).
 
 ### (c) Fönstret måste rymmas i passet  **[Etablerad praxis]**
 
@@ -170,7 +170,7 @@ stannar helt.
 
 Uppmätt på ett pass med 3 min på 450 W följt av 120 W (= 18 TSS/h) bokför verktyget
 **1,6–3,7 gånger** så stort tillskott som lugnkörningen är värd. Se
-[07 — Felkatalog, A3](07-felkatalog.md#a3--tss-ackumuleringen-planar-aldrig-ut) för
+[FA-3 i fellistan för fit-analysis](10-fel-fit-analysis.md) för
 mätserien.
 
 Kurvans absoluta nivå går alltså inte att tolka som ackumulerad dos. Det som *är*

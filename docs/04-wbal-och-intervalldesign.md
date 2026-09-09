@@ -155,7 +155,7 @@ Sänker användaren τ under ~145 s (tillåtet — gränssnittets minimum är 60
 klippt lösning på 110–120 % av CP men är ogenomförbart. En genomsökning av CP 150–350 W,
 W′ 6–30 kJ, τ 60–400 s och mål 10–30 % ger **168 sådana fall**, samtliga i de två
 pyramidmallarna. Se
-[07 — Felkatalog, B2](07-felkatalog.md#b2--endast-sluttillståndet-kontrolleras-aldrig-bottennivån).
+[WB-1 i fellistan för wbal](09-fel-wbal.md).
 
 **Fix:** villkoret ska vara på båda — `min(W′bal) > 0` som genomförbarhetskrav, slutvärdet
 som doseringsmål. De mäter olika saker.
