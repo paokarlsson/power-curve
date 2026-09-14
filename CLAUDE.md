@@ -109,6 +109,3 @@ one that looks right may be a known fault.
 1. Create a directory with an `index.html`
 2. Add a card linking to it in the root `index.html`
 3. Push to `master` - the Pages workflow picks it up with no configuration change
-
-Note that `wbal/` is not currently linked from the root `index.html` and is reachable only
-by URL.
