@@ -1,5 +1,8 @@
 # Fellista: `wbal/`
 
+> Åtgärdsplan med ordning, acceptanskriterier och mätt utfall före/efter finns i
+> [12](12-omskrivning-wbal.md).
+
 Alla fel i intervalloptimeraren. Berör två filer: **`wbal/script.js`** och
 **`wbal/index.html`**.
 

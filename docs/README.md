@@ -39,6 +39,15 @@ kod som finns i repot:
   anpassningen. Åtgärdar fyra av sex fel i [07](07-fel-power-curve.md), till priset av tre
   testpass.
 
+**Åtgärdsplaner.** Fellistorna säger vad som är fel; planerna säger i vilken ordning det
+ska rättas, med acceptanskriterier och mätt utfall före och efter:
+
+- **[12 — Omskrivning av `wbal/`](12-omskrivning-wbal.md)** — plan för de sex felen i
+  [09](09-fel-wbal.md), i fem steg. Härledd τ i stället för återhämtningsfaktor, separata
+  villkor för genomförbarhet och dosering, vidgat sökintervall med lösarstatus. Innehåller
+  mätt före/efter för alla 20 mallar, och tre justeringar av planens egna
+  acceptanskriterier.
+
 ## Var felen sitter
 
 25 fel fördelade över fyra verktyg. Fördelningen är inte jämn, och skillnaden är
