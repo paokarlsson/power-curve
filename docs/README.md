@@ -19,6 +19,7 @@ Två sammanfattande dokument:
 
 - **[06 — Etablerat vs eget](06-etablerat-vs-eget.md)** — facit över vad som är etablerad
   vetenskap och vad som är egenuppfunnet. Läs den först om du bara läser en.
+
 **Fellistor, en per verktyg.** Varje fel med fil och rad, mekanism, uppmätt storlek,
 klassificering som modell- eller implementationsfel, och ett resonemang om åtgärden. Alla
 siffror uppmätta genom att köra repots egen kod:
@@ -27,6 +28,16 @@ siffror uppmätta genom att köra repots egen kod:
 - **[08 — Fel i `running/`](08-fel-running.md)** — 4 fel
 - **[09 — Fel i `wbal/`](09-fel-wbal.md)** — 6 fel
 - **[10 — Fel i `fit-analysis/`](10-fel-fit-analysis.md)** — 9 fel
+
+**Alternativa implementationer.** En annan modell för en fråga något av verktygen redan
+besvarar, genomräknad på samma sätt som resten av dokumentationen — inte en beskrivning av
+kod som finns i repot:
+
+- **[11 — Effekt–duration: styckvis modell och testprotokoll](11-effekt-duration-protokoll.md)**
+  — alternativ till [`power-curve/`](01-critical-power.md). Tre domäner i stället för en
+  hyperbel, sex testpunkter i stället för två, och en kontrollpunkt som inte får påverka
+  anpassningen. Åtgärdar fyra av sex fel i [07](07-fel-power-curve.md), till priset av tre
+  testpass.
 
 ## Var felen sitter
 
