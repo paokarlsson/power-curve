@@ -123,16 +123,18 @@ Efter steg 1 är de 168 fall [WB-1](09-fel-wbal.md) räknade upp borta — de f�
 τ som fri parameter ner till 60 s, och τ är inte längre fri. Villkoret är därmed
 **inte** en omskrivning av dagens utfall utan ett skydd. Det biter fortfarande, men smalt.
 
-Svep över CP 50–500 W, W′ 5–40 kJ och mål-W′bal 10–50 % (alltså gränsvärdena i verktygets
-egna inmatningsfält), 14 400 kombinationer:
+Svep över CP 50–500 W (steg 25 W), W′ 5–40 kJ (steg 500 J) och mål-W′bal 10–50 %
+(steg 1 %) — alltså gränsvärdena i verktygets egna inmatningsfält — 1 106 180
+kombinationer:
 
-- **24 golvbrott (0,17 %)**, samtliga i `Pyramid 2-4-6-4-2`.
-- Alla kräver **CP ≥ 375 W** *och* **mål-W′bal ≤ 11 %**.
+- **781 golvbrott (0,071 %)**, samtliga i `Pyramid 2-4-6-4-2`.
+- Alla kräver **CP ≥ 375 W** *och* **mål-W′bal ≤ 11 %**. Lägsta CP där det inträffar är
+  375 W, lägsta mål 10 %.
 - Värsta fallet: CP 425 W, W′ 5 kJ, mål 10 % → 432 W föreskrivet, slut-W′bal 500 J
   (= målet), **bottennivå 39 J** mot marginalen 100 J.
 
-Under mål-W′bal 10 % växer det snabbt — 104 fall vid 5 %, 869 vid 2 % — men det ligger
-utanför vad gränssnittet tillåter att mata in.
+Under mål-W′bal 10 % växer det snabbt — på ett grövre rutnät 104 fall vid 5 % och 869 vid
+2 %, mot 24 vid 10 % — men det ligger utanför vad gränssnittet tillåter att mata in.
 
 ### Acceptanskriterium  **[Justerat]**
 
