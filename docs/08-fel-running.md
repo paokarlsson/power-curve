@@ -11,7 +11,9 @@ område där den gäller.
 höll inte: **RUN-5** nedan är en ren avrundningsbugg i tempovisningen, hittad när RUN-1 till
 RUN-4 åtgärdades. Den var kosmetisk men syntes på förstasidan.
 
-**Inget är åtgärdat.** Siffrorna är uppmätta genom att köra koden.
+**Åtgärdat i PR 6** enligt [13](13-genomforandeplan.md), och RUN-5 därefter. Listan beskriver
+vad som var fel och varför, inte vad som återstår. Siffrorna är uppmätta genom att köra den
+ursprungliga koden.
 
 ## Feltyper
 

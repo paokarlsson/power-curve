@@ -8,7 +8,10 @@ fönsterlängder samtidigt**, vilket förvandlar TSS från ett tal till ett spek
 variabilitetens tidsskala. Det är också verktyget med flest fel, och de två allvarligaste
 felen i hela repot.
 
-**Inget är åtgärdat.** Siffrorna är uppmätta genom att köra koden.
+**Åtgärdat i PR 7, 8 och 9** enligt [13](13-genomforandeplan.md), inklusive de två
+fortsättningar planen sköt upp: resampling till 1 Hz (FA-2) och kadens som skiljer
+sensorbortfall från frihjulning (FA-1). Listan beskriver vad som var fel och varför, inte
+vad som återstår. Siffrorna är uppmätta genom att köra den ursprungliga koden.
 
 ## Feltyper
 

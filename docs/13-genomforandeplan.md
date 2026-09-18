@@ -12,6 +12,14 @@ steg som redan står i [07](07-fel-power-curve.md)–[12](12-omskrivning-wbal.md
 dokumentationen lämnar öppna är avgjorda i §5. Alternativen står kvar där, men som motiv till
 ett fattat beslut — inte som något som ska vägas igen.
 
+**Status: genomförd.** Samtliga tio PR är körda, commit för commit enligt §4, plus de två
+fortsättningar §4 sköt upp (resampling till 1 Hz och kadenskanalen i `fit-analysis/`) och en
+bugg som inte stod i någon fellista ([RUN-5](08-fel-running.md)). Fyra ställen där
+mätningen inte höll med dokumentationen är rättade i källdokumenten och markerade
+**[Justerat]** där de hör hemma: förskjutningen i [12 §4](12-omskrivning-wbal.md),
+påståendet om implementationsfel i [08](08-fel-running.md), och TSS-per-timme i
+[10 §FA-3](10-fel-fit-analysis.md).
+
 ---
 
 ## 1. De tre frågorna, besvarade först

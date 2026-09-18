@@ -11,7 +11,9 @@ intervalleffekt genom att lösa ut den ur ett mål för återstående W′ i st�
 en procent av FTP — och samtidigt dess allvarligaste modellfel. Båda är värda att förstå,
 och de hänger ihop: felen gör att den goda idén levererar för låga effekter.
 
-**Inget är åtgärdat.** Siffrorna är uppmätta genom att köra koden mot dess egna
+**Åtgärdat i PR 1, 2 och 3** enligt [13](13-genomforandeplan.md), i den ordning
+[12](12-omskrivning-wbal.md) föreskriver. Listan beskriver vad som var fel och varför, inte
+vad som återstår. Siffrorna är uppmätta genom att köra den ursprungliga koden mot dess egna
 defaultvärden (CP 200 W, W′ 15 kJ, τ 180 s, mål 30 % kvar).
 
 ## Feltyper
