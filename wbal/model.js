@@ -40,6 +40,16 @@ const workoutTemplates = [
     { name: "2×15 min", reps: 2, work: 900, rest: 420, restPercent: 0.65, type: "threshold" }
 ];
 
+// FTP definieras protokollmässigt som ~95 % av medeleffekten i ett 20-minuterstest;
+// CP är modellens asymptot och ligger typiskt något över. Matas FTP in där modellen
+// vill ha CP blir (P − CP) för stort och W'-förbrukningen överskattad (WB-5).
+// Omräkningen är en tumregel, inte en mätning.
+const FTP_OF_CP = 0.95;
+
+function cpFromFtp(ftp) {
+    return ftp / FTP_OF_CP;
+}
+
 // τ härledd ur vilointensiteten enligt Skiba m.fl. 2012. D_CP är hur långt under
 // CP vilan ligger; ju lägre viloeffekt, desto längre τ och desto trögare
 // återhämtning. Se docs/12-omskrivning-wbal.md steg 1.
@@ -300,6 +310,7 @@ function calculateAllWorkouts(CP, W_prime, targetWbal) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         workoutTemplates,
+        cpFromFtp,
         deriveTau,
         calculateWPrimeRecovery,
         bisect,

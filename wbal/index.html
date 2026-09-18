@@ -14,10 +14,23 @@
             <h2 style="margin-bottom: 20px;">Fitness Signature</h2>
             
             <div class="input-group">
-                <label for="cp">CP (Critical Power / FTP)</label>
+                <label for="cp">CP (Critical Power)</label>
                 <div class="input-suffix" data-suffix="W">
                     <input type="number" id="cp" value="200" min="50" max="500">
                 </div>
+                <p class="input-hint">
+                    CP är inte FTP. FTP är ett mätrecept (~95 % av ett 20-minuterstest),
+                    CP är modellens asymptot och ligger något över. Har du bara FTP,
+                    välj det nedan så räknas värdet om.
+                </p>
+            </div>
+
+            <div class="input-group">
+                <label for="cpSource">Inmatat värde är</label>
+                <select id="cpSource">
+                    <option value="cp">CP, ur ett effekt-duration-test</option>
+                    <option value="ftp">FTP, ur ett 20-minuterstest</option>
+                </select>
             </div>
             
             <div class="input-group">

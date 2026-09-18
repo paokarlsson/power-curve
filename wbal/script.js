@@ -1,16 +1,21 @@
-/* global calculateAllWorkouts */
+/* global calculateAllWorkouts, cpFromFtp */
 // Gränssnittet för Intervall Optimizer: läser inmatningen, anropar model.js och ritar
 // resultatet. All matematik ligger i model.js.
 
 function calculate() {
-    const CP = parseFloat(document.getElementById('cp').value);
+    const enteredPower = parseFloat(document.getElementById('cp').value);
+    const enteredAsFtp = document.getElementById('cpSource').value === 'ftp';
+
+    // WB-5: modellen vill ha CP. Matas FTP in konverteras det explicit och märks
+    // som uppskattat - det tas aldrig tyst för att vara samma storhet.
+    const CP = enteredAsFtp ? cpFromFtp(enteredPower) : enteredPower;
     const W_prime = parseFloat(document.getElementById('wprime').value) * 1000;
     const targetWbalPercent = parseFloat(document.getElementById('targetWbal').value) / 100;
     const targetWbal = W_prime * targetWbalPercent;
 
     const workouts = calculateAllWorkouts(CP, W_prime, targetWbal);
 
-    displayResults(workouts, CP, W_prime, targetWbalPercent);
+    displayResults(workouts, CP, W_prime, targetWbalPercent, enteredAsFtp ? enteredPower : null);
 }
 
 function formatTime(seconds) {
@@ -33,7 +38,7 @@ function formatDuration(seconds) {
     return `${seconds}s`;
 }
 
-function displayResults(workouts, CP, W_prime, targetWbalPercent) {
+function displayResults(workouts, CP, W_prime, targetWbalPercent, ftp) {
     const resultsDiv = document.getElementById('results');
 
     // Summary card
@@ -41,8 +46,8 @@ function displayResults(workouts, CP, W_prime, targetWbalPercent) {
         <div class="summary-card">
             <h2>Din Fitness Signature</h2>
             <div class="result-detail">
-                <span class="result-label">CP (FTP):</span>
-                <span class="result-value">${CP}W</span>
+                <span class="result-label">${ftp === null ? 'CP:' : 'CP (uppskattad ur FTP):'}</span>
+                <span class="result-value">${Number.isInteger(CP) ? CP : CP.toFixed(1).replace('.', ',')}W</span>
             </div>
             <div class="result-detail">
                 <span class="result-label">W' (Anaerob Kapacitet):</span>
@@ -52,6 +57,12 @@ function displayResults(workouts, CP, W_prime, targetWbalPercent) {
                 <span class="result-label">Mål W'bal efter pass:</span>
                 <span class="result-value">${Math.round(targetWbalPercent * 100)}% (${Math.round(W_prime * targetWbalPercent)}J)</span>
             </div>
+            ${ftp === null ? '' : `
+            <p class="estimated-note">
+                Uppskattad ur FTP ${ftp}W med CP ≈ FTP / 0,95. Det är en tumregel, inte en
+                mätning - ett CP ur ett effekt-duration-test är alltid att föredra.
+            </p>
+            `}
         </div>
 
         <h2 style="color: #4CAF50; margin-bottom: 20px; text-align: center;">

@@ -235,6 +235,25 @@ test('out_of_range visas aldrig som en vanlig rekommendation', () => {
     assert.equal(workout.minWbal, null);
 });
 
+test('FTP räknas om till CP med tumregeln CP = FTP / 0,95', () => {
+    assert.equal(model.cpFromFtp(200).toFixed(4), (200 / 0.95).toFixed(4));
+    assert.ok(model.cpFromFtp(200) > 200, 'CP ska ligga över FTP');
+});
+
+test('FTP 200 W inmatat ger exakt samma siffror som CP 210,5 W', () => {
+    // Acceptanskriteriet för steg 4 i docs/12-omskrivning-wbal.md.
+    const fromFtp = model.calculateAllWorkouts(model.cpFromFtp(200), W_PRIME, TARGET_WBAL);
+    const fromCp = model.calculateAllWorkouts(210.5, W_PRIME, TARGET_WBAL);
+
+    assert.equal(fromFtp.length, fromCp.length);
+    for (let i = 0; i < fromFtp.length; i++) {
+        assert.equal(fromFtp[i].status, fromCp[i].status, fromFtp[i].name);
+        assert.equal(fromFtp[i].power, fromCp[i].power, fromFtp[i].name);
+        assert.equal(fromFtp[i].percentage, fromCp[i].percentage, fromFtp[i].name);
+        assert.equal(Math.round(fromFtp[i].minWbal), Math.round(fromCp[i].minWbal), fromFtp[i].name);
+    }
+});
+
 // ---------------------------------------------------------------------------
 // Snapshot: mätta tal ur docs/12-omskrivning-wbal.md
 // ---------------------------------------------------------------------------

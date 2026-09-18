@@ -45,7 +45,8 @@ label {
     letter-spacing: 1px;
 }
 
-input {
+input,
+select {
     width: 100%;
     padding: 12px;
     background: #1a1a1a;
@@ -56,9 +57,24 @@ input {
     transition: border-color 0.3s;
 }
 
-input:focus {
+input:focus,
+select:focus {
     outline: none;
     border-color: #4CAF50;
+}
+
+.input-hint {
+    margin: 8px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #999;
+}
+
+.estimated-note {
+    margin: 10px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #e0a030;
 }
 
 .input-suffix {
