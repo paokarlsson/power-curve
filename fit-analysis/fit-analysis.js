@@ -10,7 +10,8 @@ const CONFIG = {
     DEFAULT_POWER_EXPONENT: 4, // Power exponent for NP calculations
 
     // Data processing constants
-    WINDOW_COVERAGE_THRESHOLD: 0.5 // Minimum share of a window that must be covered by samples
+    WINDOW_COVERAGE_THRESHOLD: 0.5, // Minimum share of a window that must be covered by samples
+    RESAMPLE_HZ: 1                  // NP är definierad på 1-sekundersdata
 };
 
 // En standardinställning ska ha exakt en definition. Både initieringen och
@@ -913,20 +914,71 @@ function cleanPowerData(rawPowerData) {
     return cleaned;
 }
 
+// Mediansamplingsintervallet, alltså hur tätt filen faktiskt spelar in.
+function medianInterval(powerData) {
+    const gaps = [];
+    for (let i = 1; i < powerData.length; i++) {
+        gaps.push(powerData[i].t - powerData[i - 1].t);
+    }
+    if (gaps.length === 0) return 1;
+
+    gaps.sort((a, b) => a - b);
+    return gaps[Math.floor(gaps.length / 2)];
+}
+
+// Resampla till 1 Hz före beräkningen (FA-2, den riktiga lösningen). Standard-NP
+// är definierad på 1-sekundersdata, och ett rullande medelvärde förutsätter jämnt
+// spridda punkter - med gles eller ojämn sampling räknar man i praktiken på något
+// annat än NP, oavsett hur täckningskravet formuleras. Efteråt betyder varje
+// fönsterlängd samma sak i alla filer, vilket är en förutsättning för att
+// fönsterspektrumet ska gå att jämföra mellan pass och enheter.
+//
+// Senaste värdet hålls över luckor upp till tre mediansamplingsintervall, vilket
+// är vad smart recording betyder: en punkt skrivs när värdet ändras. Större
+// luckor är pauser eller signalbortfall och lämnas tomma - då avvisar
+// täckningskravet de fönster som överlappar dem, i stället för att koden hittar
+// på effekt som aldrig mättes.
+function resampleTo1Hz(powerData) {
+    if (powerData.length < 2) return powerData;
+
+    const maxHold = Math.max(2, 3 * medianInterval(powerData));
+    const firstSecond = Math.ceil(powerData[0].t);
+    const lastSecond = Math.floor(powerData[powerData.length - 1].t);
+    const resampled = [];
+    let index = 0;
+
+    for (let t = firstSecond; t <= lastSecond; t++) {
+        while (index + 1 < powerData.length && powerData[index + 1].t <= t) {
+            index++;
+        }
+
+        const sample = powerData[index];
+        if (t - sample.t <= maxHold) {
+            resampled.push({ ...sample, t: t });
+        }
+    }
+
+    console.log(`🕐 Resampled to 1 Hz: ${powerData.length} → ${resampled.length} points (max hold ${maxHold}s)`);
+    return resampled;
+}
+
 function computeNP_by_time(rawPowerData, ftp, windowSecondsList = TSS_WINDOW_SECONDS, exponent = CONFIG.DEFAULT_POWER_EXPONENT) {
     if (!rawPowerData || rawPowerData.length < 2) throw new Error("Behöver minst två datapunkter med tidsstämplar.");
 
-    // Clean the data first
-    const powerData = cleanPowerData(rawPowerData);
+    // Clean the data first, then put it on a 1 Hz grid
+    const cleanedData = cleanPowerData(rawPowerData);
+    const powerData = resampleTo1Hz(cleanedData);
+
+    if (powerData.length < 2) throw new Error("Behöver minst två datapunkter med tidsstämplar.");
 
     // Basic stats
     const firstTs = powerData[0].t;
     const lastTs = powerData[powerData.length - 1].t;
     const duration = lastTs - firstTs;
     const samples = powerData.length;
-    const avgSamplingHz = samples / duration;
+    const sourceSamplingHz = cleanedData.length / (cleanedData[cleanedData.length - 1].t - cleanedData[0].t);
 
-    console.log('📊 Data stats:', samples, 'points over', duration.toFixed(1), 's, sampling:', avgSamplingHz.toFixed(2), 'Hz');
+    console.log('📊 Data stats:', samples, 'points over', duration.toFixed(1), 's, filens sampling:', sourceSamplingHz.toFixed(2), 'Hz');
 
     // Robust window averaging with fixed step size
     function robustWindowAverages(windowSec) {
@@ -935,12 +987,11 @@ function computeNP_by_time(rawPowerData, ftp, windowSecondsList = TSS_WINDOW_SEC
         const averages = [];
         const stepSize = Math.max(1, Math.floor(windowSec / 60)); // Adaptive step size
 
-        // Täckningskravet är en kvot, och en kvot jämför två storheter av samma slag.
-        // Förväntat antal punkter kommer ur filens egen samplingsfrekvens, inte ur
-        // antagandet att den spelar in en gång per sekund (FA-2). Annars uppfyller en
-        // helt komplett fil inspelad glesare än varannan sekund - vilket smart
-        // recording producerar - aldrig villkoret, och samtliga fönster kastas.
-        const minPoints = windowSec * avgSamplingHz * CONFIG.WINDOW_COVERAGE_THRESHOLD;
+        // Täckningskravet är en kvot, och nu jämför den två storheter av samma slag:
+        // serien ligger på ett 1 Hz-rutnät, så förväntat antal punkter är
+        // fönsterlängden i sekunder. Bara äkta luckor - pauser och signalbortfall
+        // som resamplingen lämnade tomma - kan numera fälla ett fönster.
+        const minPoints = windowSec * CONFIG.RESAMPLE_HZ * CONFIG.WINDOW_COVERAGE_THRESHOLD;
 
         for (let start = firstTs; start + windowSec <= lastTs; start += stepSize) {
             const end = start + windowSec;
@@ -960,7 +1011,7 @@ function computeNP_by_time(rawPowerData, ftp, windowSecondsList = TSS_WINDOW_SEC
         duration,
         firstTs,
         lastTs,
-        avgSamplingHz,
+        sourceSamplingHz,
         windows: {}
     };
 
