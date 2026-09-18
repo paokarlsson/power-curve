@@ -1,5 +1,9 @@
 # Critical Power-modellen (`power-curve/`)
 
+> En alternativ modell för samma fråga — styckvis över tre domäner, med ett testprotokoll
+> som ger residualer — finns i [11](11-effekt-duration-protokoll.md). Den åtgärdar fyra av
+> de sex fel som listas i [07](07-fel-power-curve.md).
+
 ## 1. Modellen  **[Etablerad]**
 
 Tvåparametersmodellen (Monod & Scherrer 1965; Moritz 1981; Hill 1993) uttrycks i två
