@@ -136,6 +136,13 @@
             margin-top: 4px;
         }
 
+        .stat-note {
+            font-size: 0.7rem;
+            opacity: 0.85;
+            margin-top: 6px;
+            font-style: italic;
+        }
+
         .predictions {
             background: #2a2a2a;
             padding: 25px;
@@ -307,9 +314,10 @@
                 <div class="stat-value" id="dPrime">-</div>
             </div>
             <div class="stat-card purple">
-                <div class="stat-label">Maximal distans (1h)</div>
+                <div class="stat-label">Maximal distans (30 min)</div>
                 <div class="stat-value" id="maxDist">-</div>
                 <div class="stat-sub" id="maxDistKm">-</div>
+                <div class="stat-note">ett tak, inte en prognos</div>
             </div>
         </div>
 
@@ -423,15 +431,18 @@
                 // Convert CS to km/h
                 const CS_kmh = CS * 3.6;
 
-                // Max distance in 1 hour
-                const maxDist1h = CS * 3600 + Dprime;
+                // Den linjära formen används rakt, precis som avsedd, men en timme är
+                // fyra gånger den övre gränsen för modellens domän (~15 min) och ärver
+                // därmed hela den optimistiska biasen från de långa prediktionerna.
+                // 30 min ligger nära domänen och ger ett tal som går att läsa (RUN-4).
+                const maxDist30min = CS * 1800 + Dprime;
 
                 // Update stats
                 document.getElementById('csKmh').textContent = `${CS_kmh.toFixed(1)} km/h`;
                 document.getElementById('csPace').textContent = formatPace(CS);
                 document.getElementById('dPrime').textContent = `${Math.round(Dprime)}m`;
-                document.getElementById('maxDist').textContent = `${Math.round(maxDist1h)}m`;
-                document.getElementById('maxDistKm').textContent = `${(maxDist1h / 1000).toFixed(2)} km`;
+                document.getElementById('maxDist').textContent = `${Math.round(maxDist30min)}m`;
+                document.getElementById('maxDistKm').textContent = `${(maxDist30min / 1000).toFixed(2)} km`;
 
                 // Update info text
                 document.getElementById('point1Info').innerHTML = 
