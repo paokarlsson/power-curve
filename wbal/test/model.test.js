@@ -39,6 +39,12 @@ function templateByName(name) {
 // Invarianter
 // ---------------------------------------------------------------------------
 
+test('mallistan har 19 pass efter att tabatamallen tagits bort', () => {
+    // WB-6: 8×(8×20s) var 64 repetitioner och 52 minuter. Klassisk tabata är ett set.
+    assert.equal(model.workoutTemplates.length, 19);
+    assert.equal(model.workoutTemplates.filter(t => t.name === '8×(8×20s)').length, 0);
+});
+
 test('varje mall har namn, typ och vilointensitet', () => {
     const names = new Set();
     for (const template of model.workoutTemplates) {

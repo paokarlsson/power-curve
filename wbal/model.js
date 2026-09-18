@@ -26,7 +26,6 @@ const workoutTemplates = [
     { name: "10×1 min", reps: 10, work: 60, rest: 90, restPercent: 0.4, type: "anaerobic" },
 
     // Tabata style
-    { name: "8×(8×20s)", sets: 8, reps: 8, work: 20, rest: 10, setRest: 180, restPercent: 0.3, type: "anaerobic" },
     { name: "3×(10×40s)", sets: 3, reps: 10, work: 40, rest: 20, setRest: 180, restPercent: 0.4, type: "anaerobic" },
 
     // Pyramids
