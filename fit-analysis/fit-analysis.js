@@ -10,7 +10,6 @@ const CONFIG = {
     DEFAULT_POWER_EXPONENT: 4, // Power exponent for NP calculations
 
     // Data processing constants
-    MIN_POWER_DROPOUT: 30,      // Minimum power value for dropout replacement
     WINDOW_COVERAGE_THRESHOLD: 0.5 // Minimum share of a window that must be covered by samples
 };
 
@@ -780,31 +779,39 @@ function cleanPowerData(rawPowerData) {
         }
     }
 
-    // Step 2: Fix sensor dropouts (0W values)
+    // Step 2: Interpolate isolated zeros - de är sannolikt sensorbortfall, eftersom
+    // effekten är positiv både före och efter. Sammanhängande nollor lämnas som de
+    // är: på cykel är de nästan alltid frihjulning, och noll är då korrekt uppmätt
+    // data (FA-1). Ett golv på 30 W uppfann effekt som aldrig trampades, och felet
+    // växte med frihjulningen - upp till +54 % TSS - så det gick inte att kalibrera
+    // bort. Att skilja äkta bortfall från frihjulning kräver kadens och hastighet,
+    // som finns i FIT-filen men inte läses in.
     const cleaned = [];
-    let zeroDropouts = 0;
+    let interpolated = 0;
+    let trueZeros = 0;
 
     for (let i = 0; i < deduped.length; i++) {
         const current = deduped[i];
 
         if (current.p === 0) {
-            zeroDropouts++;
             const prevPower = i > 0 ? deduped[i - 1].p : 0;
             const nextPower = i < deduped.length - 1 ? deduped[i + 1].p : 0;
 
             if (prevPower > 0 && nextPower > 0) {
                 // Interpolate isolated zeros
+                interpolated++;
                 cleaned.push({ ...current, p: (prevPower + nextPower) / 2 });
             } else {
-                // Use minimum viable power for other zeros
-                cleaned.push({ ...current, p: CONFIG.MIN_POWER_DROPOUT });
+                // Sammanhängande nolla: behåll den, den är data
+                trueZeros++;
+                cleaned.push(current);
             }
         } else {
             cleaned.push(current);
         }
     }
 
-    console.log(`🔧 Cleaned: ${sortedData.length} → ${deduped.length} → ${cleaned.length} points, fixed ${zeroDropouts} dropouts`);
+    console.log(`🔧 Cleaned: ${sortedData.length} → ${deduped.length} → ${cleaned.length} points, ${interpolated} isolated zeros interpolated, ${trueZeros} zeros kept as data`);
     return cleaned;
 }
 
