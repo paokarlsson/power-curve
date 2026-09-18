@@ -328,6 +328,13 @@
                 markeringen på kortet. Talen är desamma - det är tilliten till dem som skiljer.
             </p>
             <p class="prediction-legend">
+                <strong style="color: white">Kort ände (800 m, 1500 m):</strong> v(t) = CS + D′/t går mot oändligheten när
+                t → 0, så modellen har ingen övre hastighetsgräns och kan per definition inte beskriva sprintdistanser.
+                D′ skattat ur insatser på 3-20 minuter fångar dessutom inte den neuromuskulära kapacitet som avgör
+                800 m. Tiderna kan se rimliga ut, men de är extrapolationer utanför modellen - läs dem som
+                <strong>"minst så snabbt"</strong>.
+            </p>
+            <p class="prediction-legend">
                 <strong style="color: white">Lång ände (halvmara, mara):</strong> modellen låter tempot närma sig CS
                 <em>uppifrån</em>, så den predikterade hastigheten är alltid snabbare än CS - för varje distans.
                 Verkligheten är den omvända: maraton springs <em>under</em> CS, eftersom substrattillgång,
@@ -449,7 +456,7 @@
 
         // Vad markeringen betyder i respektive ände av domänen.
         const DOMAIN_MARKS = {
-            short: 'utanför modellens giltighet',
+            short: 'utanför giltigheten – läs som <strong>"minst så snabbt"</strong>',
             long: 'utanför giltigheten – läs som ett <strong>tak</strong>, aldrig som en prognos'
         };
 
