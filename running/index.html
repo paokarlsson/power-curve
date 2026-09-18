@@ -136,6 +136,20 @@
             margin-top: 4px;
         }
 
+        .message {
+            background: #3a2d10;
+            border-left: 4px solid #FBBF24;
+            padding: 14px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .message.hidden {
+            display: none;
+        }
+
         .stat-note {
             font-size: 0.7rem;
             opacity: 0.85;
@@ -302,16 +316,21 @@
             </div>
         </div>
 
+        <!-- Meddelanden om indata -->
+        <div id="message" class="message hidden"></div>
+
         <!-- Stats Section -->
         <div class="stats-grid">
             <div class="stat-card green">
                 <div class="stat-label">CS (Critical Speed)</div>
                 <div class="stat-value" id="csKmh">-</div>
                 <div class="stat-sub" id="csPace">-</div>
+                <div class="stat-note" id="csSpan">-</div>
             </div>
             <div class="stat-card cyan">
                 <div class="stat-label">D' (Anaerob kapacitet)</div>
                 <div class="stat-value" id="dPrime">-</div>
+                <div class="stat-sub" id="dPrimeSpan">-</div>
             </div>
             <div class="stat-card purple">
                 <div class="stat-label">Maximal distans (30 min)</div>
@@ -372,6 +391,7 @@
             <p id="point2Info">• Punkt 2: -</p>
             <p id="csInfo">• CS: -</p>
             <p id="dprimeInfo">• D': -</p>
+            <p id="sensitivityInfo">• Känslighet: -</p>
         </div>
     </div>
 
@@ -409,6 +429,58 @@
             return `${mins}:${secs.toString().padStart(2, '0')}`;
         }
 
+        // Hur mycket CS och D′ rör sig av ett tidsmätfel på loppen. Tvåpunktsmetoden
+        // ger exakt en lösning utan residual, så det här är det enda sättet att se
+        // hur mycket man får lita på tredje värdesiffran (RUN-3).
+        const TIME_ERROR = 5; // sekunder
+
+        function sensitivity(d1, t1, d2, t2) {
+            let csMin = Infinity, csMax = -Infinity;
+            let dpMin = Infinity, dpMax = -Infinity;
+
+            [-TIME_ERROR, TIME_ERROR].forEach(e1 => {
+                [-TIME_ERROR, TIME_ERROR].forEach(e2 => {
+                    const T1 = t1 + e1;
+                    const T2 = t2 + e2;
+                    if (T1 <= 0 || T2 <= 0 || T1 === T2) return;
+
+                    const cs = (d2 - d1) / (T2 - T1);
+                    const dp = d1 - cs * T1;
+                    csMin = Math.min(csMin, cs);
+                    csMax = Math.max(csMax, cs);
+                    dpMin = Math.min(dpMin, dp);
+                    dpMax = Math.max(dpMax, dp);
+                });
+            });
+
+            return {
+                csKmh: (csMax - csMin) * 3.6 / 2,
+                dprime: (dpMax - dpMin) / 2
+            };
+        }
+
+        function showMessage(html) {
+            const box = document.getElementById('message');
+            box.innerHTML = html;
+            box.classList.remove('hidden');
+        }
+
+        function clearMessage() {
+            const box = document.getElementById('message');
+            box.textContent = '';
+            box.classList.add('hidden');
+        }
+
+        // Inga siffror alls hellre än siffror som inte hör ihop med inmatningen -
+        // samma regel som power-curve/ följer när indata avvisas.
+        function blankStats() {
+            ['csKmh', 'csPace', 'csSpan', 'dPrime', 'dPrimeSpan', 'maxDist', 'maxDistKm',
+                'point1Info', 'point2Info', 'csInfo', 'dprimeInfo', 'sensitivityInfo'].forEach(id => {
+                document.getElementById(id).textContent = '-';
+            });
+            document.getElementById('predictionGrid').innerHTML = '';
+        }
+
         function calculate() {
             try {
                 const d1 = parseFloat(r1DistInput.value) || 0;
@@ -417,7 +489,10 @@
                 const t2 = parseFloat(r2TimeInput.value) || 0;
 
                 if (d1 <= 0 || t1 <= 0 || d2 <= 0 || t2 <= 0 || t1 === t2) {
-                    console.log('Invalid input values');
+                    showMessage(t1 === t2 && t1 > 0
+                        ? '<strong>Loppen måste ha olika tid.</strong> CS är lutningen mellan två punkter i distans–tid-planet, och två lopp på samma tid definierar ingen lutning.'
+                        : '<strong>Ofullständig inmatning.</strong> Distans och tid måste vara positiva tal för båda loppen.');
+                    blankStats();
                     return;
                 }
 
@@ -430,6 +505,9 @@
 
                 // Convert CS to km/h
                 const CS_kmh = CS * 3.6;
+
+                const separation = Math.abs(t2 - t1);
+                const span = sensitivity(d1, t1, d2, t2);
 
                 // Den linjära formen används rakt, precis som avsedd, men en timme är
                 // fyra gånger den övre gränsen för modellens domän (~15 min) och ärver
@@ -453,6 +531,28 @@
                     `• <span style="color: #10B981">CS (${CS_kmh.toFixed(1)} km/h = ${formatPace(CS)})</span> = Lutningen på kurvan`;
                 document.getElementById('dprimeInfo').innerHTML = 
                     `• <span style="color: #06B6D4">D' (${Math.round(Dprime)}m)</span> = Y-intercept på kurvan (anaerob reserv)`;
+                document.getElementById('sensitivityInfo').innerHTML =
+                    `• <span style="color: #FBBF24">Känslighet:</span> två punkter ger exakt en lösning, alltså ingen
+                     residual och ingen konfidens. Med ${TIME_ERROR} s mätfel på loppen rör sig CS
+                     ±${span.csKmh.toFixed(2)} km/h och D′ ±${Math.round(span.dprime)} m - tredje
+                     värdesiffran är fiktion.`;
+
+                // Separationen mellan loppen avgör hur mycket lutningen svänger av ett
+                // mätfel. Samma geometri som gör ett långt sikte mer precist än ett kort.
+                document.getElementById('csSpan').textContent =
+                    `±${span.csKmh.toFixed(2)} km/h vid ${TIME_ERROR} s mätfel`;
+                document.getElementById('dPrimeSpan').textContent =
+                    `±${Math.round(span.dprime)}m vid ${TIME_ERROR} s mätfel`;
+
+                if (separation < 180) {
+                    showMessage(`<strong>Loppen ligger bara ${Math.round(separation)} s ifrån varandra i tid.</strong>
+                        CS är lutningen mellan två punkter, så ju närmare loppen ligger på tidsaxeln desto mer svänger
+                        skattningen av ett litet mätfel: här flyttar ${TIME_ERROR} s fel CS ±${span.csKmh.toFixed(2)} km/h
+                        och D′ ±${Math.round(span.dprime)} m. Välj två lopp med <strong>minst 3 minuters skillnad</strong>
+                        i tid - verktygets defaultvärden, 180 s och 1200 s, är ett bra exempel.`);
+                } else {
+                    clearMessage();
+                }
 
                 // Generate predictions
                 generatePredictions(CS, Dprime);
