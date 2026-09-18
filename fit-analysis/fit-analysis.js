@@ -32,13 +32,14 @@ const DEFAULT_TSS_CONFIGS = {
         chartBackground: '#fff3e0'
     },
     W30: {
-        seconds: 30, // Coggans standardfönster
+        seconds: 30, // Coggans standardfönster - det enda med en publicerad definition
         displayKey: 'w30',
         elementId: 'tssW30',
-        label: 'TSS@30s',
+        label: 'TSS@30s (referens)',
         chartColor: '#7b1fa2',
         chartBackground: '#f3e5f5',
-        fixed: true // Cannot be edited or removed
+        fixed: true, // Cannot be edited or removed
+        reference: true // Jämförbar med Strava, TrainingPeaks och WKO (FA-5)
     },
     W180: {
         seconds: 180,
@@ -611,7 +612,7 @@ function plotTSSAccumulation(tssData) {
                 data: tssData.timestamps.map((time, i) => ({ x: time, y: tssData[config.elementId][i] })),
                 borderColor: config.chartColor,
                 backgroundColor: hexToRgba(config.chartColor, 0.1),
-                borderWidth: 2,
+                borderWidth: config.reference ? 3 : 2,
                 tension: 0.4,
                 fill: false,
                 pointRadius: 0,
@@ -1489,6 +1490,7 @@ function rebuildTSSDisplay() {
         statBox.innerHTML = `
             <div class="stat-label">${config.label}</div>
             <div class="stat-value" id="${config.elementId}" style="color: ${config.chartColor};">--</div>
+            ${config.reference ? '<div class="stat-note">Coggans standardfönster – den siffra som går att jämföra med Strava, TrainingPeaks och WKO. Övriga fönster är verktygets egen utvidgning.</div>' : ''}
         `;
         container.appendChild(statBox);
     });
