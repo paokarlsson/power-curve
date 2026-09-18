@@ -13,42 +13,55 @@ const CONFIG = {
     WINDOW_COVERAGE_THRESHOLD: 0.5 // Minimum share of a window that must be covered by samples
 };
 
-// Dynamic TSS configurations - can be modified at runtime
-let TSS_CONFIGS = {
-        SPRINT: {
-            seconds: 10,
-            displayKey: 'tenSecond',
-            elementId: 'tssSprint',
-            label: 'TSS (Sprint)',
-            chartColor: '#f57c00',
-            chartBackground: '#fff3e0'
-        },
-        VO2_MAX: {
-            seconds: 180,
-            displayKey: 'threeMinute',
-            elementId: 'tssVo2Max',
-            label: 'TSS (VO2max)',
-            chartColor: '#388e3c',
-            chartBackground: '#e8f5e8'
-        },
-        THRESHOLD: {
-            seconds: 600,
-            displayKey: 'tenMinute',
-            elementId: 'tssThreshold',
-            label: 'TSS (Threshold)',
-            chartColor: '#1976d2',
-            chartBackground: '#e3f2fd'
-        },
-        STANDARD: {
-            seconds: 30, // Fixed 30-second standard
-            displayKey: 'standard',
-            elementId: 'tssStandard',
-            label: 'TSS (Standard)',
-            chartColor: '#7b1fa2',
-            chartBackground: '#f3e5f5',
-            fixed: true // Cannot be edited or removed
-        }
+// En standardinställning ska ha exakt en definition. Både initieringen och
+// resetTSSConfigs() läser härifrån, och kopierar vid tilldelning så att reset
+// verkligen återställer i stället för att dela referens (FA-9).
+const DEFAULT_TSS_CONFIGS = {
+    SPRINT: {
+        seconds: 10,
+        displayKey: 'tenSecond',
+        elementId: 'tssSprint',
+        label: 'TSS (Sprint)',
+        chartColor: '#f57c00',
+        chartBackground: '#fff3e0'
+    },
+    VO2_MAX: {
+        seconds: 180,
+        displayKey: 'threeMinute',
+        elementId: 'tssVo2Max',
+        label: 'TSS (VO2max)',
+        chartColor: '#388e3c',
+        chartBackground: '#e8f5e8'
+    },
+    THRESHOLD: {
+        seconds: 600,
+        displayKey: 'tenMinute',
+        elementId: 'tssThreshold',
+        label: 'TSS (Threshold)',
+        chartColor: '#1976d2',
+        chartBackground: '#e3f2fd'
+    },
+    STANDARD: {
+        seconds: 30, // Fixed 30-second standard
+        displayKey: 'standard',
+        elementId: 'tssStandard',
+        label: 'TSS (Standard)',
+        chartColor: '#7b1fa2',
+        chartBackground: '#f3e5f5',
+        fixed: true // Cannot be edited or removed
+    }
 };
+
+function createDefaultTSSConfigs() {
+    const configs = {};
+    Object.entries(DEFAULT_TSS_CONFIGS).forEach(([key, config]) => {
+        configs[key] = { ...config };
+    });
+    return configs;
+}
+
+// Dynamic TSS configurations - can be modified at runtime
+let TSS_CONFIGS = createDefaultTSSConfigs();
 
 // Function to get current TSS window seconds array
 function getTSSWindowSeconds() {
@@ -1397,41 +1410,7 @@ function addNewTSSConfig() {
 }
 
 function resetTSSConfigs() {
-    TSS_CONFIGS = {
-        SPRINT: {
-            seconds: 10,
-            displayKey: 'tenSecond',
-            elementId: 'tssSprint',
-            label: 'TSS (Sprint)',
-            chartColor: '#f57c00',
-            chartBackground: '#fff3e0'
-        },
-        VO2_MAX: {
-            seconds: 180,
-            displayKey: 'threeMinute',
-            elementId: 'tssVo2Max',
-            label: 'TSS (VO2max)',
-            chartColor: '#388e3c',
-            chartBackground: '#e8f5e8'
-        },
-        THRESHOLD: {
-            seconds: 600,
-            displayKey: 'tenMinute',
-            elementId: 'tssThreshold',
-            label: 'TSS (Threshold)',
-            chartColor: '#1976d2',
-            chartBackground: '#e3f2fd'
-        },
-        STANDARD: {
-            seconds: 30, // Fixed 30-second standard
-            displayKey: 'standard',
-            elementId: 'tssStandard',
-            label: 'TSS (Standard)',
-            chartColor: '#7b1fa2',
-            chartBackground: '#f3e5f5',
-            fixed: true // Cannot be edited or removed
-        }
-    };
+    TSS_CONFIGS = createDefaultTSSConfigs();
 
     renderTSSConfigList();
     rebuildTSSDisplay();
