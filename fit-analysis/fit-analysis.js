@@ -267,9 +267,7 @@ function recalculateTSS(powerRecords, ftp) {
     console.log('TSS Results:', tssResults);
 
     // Update TSS display values for all current configs
-    Object.keys(TSS_CONFIGS).forEach(windowType => {
-        updateTSSElement(windowType, tssResults);
-    });
+    updateTSSDisplayValues(tssResults);
 
     // Recalculate and update TSS accumulation chart
     const tssAccumulation = calculateTSSAccumulation(powerData, ftp, powerExponent);
@@ -703,17 +701,14 @@ function updateStats(hrRecords, powerRecords, timestamps, tssResults) {
 
     // TSS stats
     if (tssResults) {
-        // Update all TSS values for current configs
-        Object.keys(TSS_CONFIGS).forEach(windowType => {
-            updateTSSElement(windowType, tssResults);
-        });
-
+        updateTSSDisplayValues(tssResults);
         document.getElementById('tssStats').style.display = 'grid';
     } else {
         // Clear all TSS values when no results available
         Object.keys(TSS_CONFIGS).forEach(windowType => {
             updateElementText(TSS_CONFIGS[windowType].elementId, '--');
         });
+        updateElementText('tssSpread', '--');
         document.getElementById('tssStats').style.display = 'none';
     }
 }
@@ -753,6 +748,54 @@ function updateElementText(elementId, value) {
         element.textContent = value;
     } else {
         console.warn(`Element with id '${elementId}' not found`);
+    }
+}
+
+// Variabilitetsindex: skillnaden mellan kortaste och längsta fönstret (FA-4).
+// Ett kort fönster låter topparna överleva utjämningen, ett långt slätar ut dem och
+// konvergerar mot medeleffekten - alltså mäter avståndet mellan dem hur ojämnt
+// passet var. All data finns redan beräknad; det är spektrumets läsvärde.
+function calculateVariabilitySpread(tssResults) {
+    const windows = Object.values(TSS_CONFIGS).filter(config => config.seconds > 0);
+    if (windows.length < 2) return null;
+
+    const shortest = windows.reduce((a, b) => (a.seconds <= b.seconds ? a : b));
+    const longest = windows.reduce((a, b) => (a.seconds >= b.seconds ? a : b));
+
+    const shortData = tssResults.windows[shortest.displayKey];
+    const longData = tssResults.windows[longest.displayKey];
+    if (!shortData?.available || !longData?.available) return null;
+
+    return {
+        spread: shortData.tss - longData.tss,
+        shortSeconds: shortest.seconds,
+        longSeconds: longest.seconds
+    };
+}
+
+// Läsregeln ur docs/10-fel-fit-analysis.md FA-4.
+function readVariabilitySpread(spread) {
+    if (spread < 5) return 'jämnt distans- eller tempopass, dosen är aerob';
+    if (spread <= 20) return 'strukturerade långa intervaller, måttlig variabilitet';
+    if (spread <= 40) return 'tydlig variabilitet, mellan de dokumenterade banden';
+    return 'kort, hård, intermittent belastning – den anaeroba kostnaden dominerar';
+}
+
+// Uppdatera samtliga TSS-rutor plus spridningen. Både omräkningen och
+// statistikpanelen går genom den här, så de kan inte glida ifrån varandra.
+function updateTSSDisplayValues(tssResults) {
+    Object.keys(TSS_CONFIGS).forEach(windowType => {
+        updateTSSElement(windowType, tssResults);
+    });
+
+    const variability = calculateVariabilitySpread(tssResults);
+    if (variability) {
+        updateElementText('tssSpread', variability.spread.toFixed(1));
+        updateElementText('tssSpreadNote',
+            `TSS@${variability.shortSeconds}s − TSS@${variability.longSeconds}s: ${readVariabilitySpread(variability.spread)}`);
+    } else {
+        updateElementText('tssSpread', '--');
+        updateElementText('tssSpreadNote', 'kräver minst två beräknade fönster');
     }
 }
 
@@ -1437,6 +1480,16 @@ function rebuildTSSDisplay() {
         `;
         container.appendChild(statBox);
     });
+
+    const spreadBox = document.createElement('div');
+    spreadBox.className = 'stat-box';
+    spreadBox.style.background = '#fffde7';
+    spreadBox.innerHTML = `
+        <div class="stat-label">Spridning (variabilitet)</div>
+        <div class="stat-value" id="tssSpread" style="color: #f9a825;">--</div>
+        <div class="stat-note" id="tssSpreadNote"></div>
+    `;
+    container.appendChild(spreadBox);
 }
 
 // Make functions globally available for HTML onclick handlers
