@@ -111,6 +111,11 @@ function displayResults(workouts, CP, W_prime, tau, targetWbalPercent) {
                 ` : ''}
 
                 <div class="result-detail">
+                    <span class="result-label">Lägsta W'bal i passet:</span>
+                    <span class="result-value">${Math.round(workout.minWbal)} J (${Math.round(workout.minWbal / W_prime * 100)}% av W')</span>
+                </div>
+
+                <div class="result-detail">
                     <span class="result-label">Total arbetstid:</span>
                     <span class="result-value">${formatTime(workout.stats.totalWorkTime)}</span>
                 </div>

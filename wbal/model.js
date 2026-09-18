@@ -47,97 +47,105 @@ function calculateWPrimeRecovery(W_prime, W_bal, restTime, tau, recoveryFactor) 
     return Math.min(W_bal + W_recovered, W_prime);
 }
 
-// Separate workout simulation functions
-function simulatePyramidWorkout(template, power, CP, W_prime, tau, restPower) {
+// Simuleringstillstånd. Samlar tömning, återhämtning och minimispårning på ett
+// ställe så att min(W'bal) inte kan glömmas i någon av passtyperna nedan.
+function createSimulation(CP, W_prime, tau, restPower) {
+    const recoveryFactor = (CP - restPower) / CP;
     let W_bal = W_prime;
+    let minWbal = W_prime;
+
+    return {
+        work: function(power, duration) {
+            W_bal -= (power - CP) * duration;
+            if (W_bal < minWbal) {
+                minWbal = W_bal;
+            }
+        },
+        rest: function(duration) {
+            W_bal = calculateWPrimeRecovery(W_prime, W_bal, duration, tau, recoveryFactor);
+        },
+        result: function() {
+            return { finalWbal: W_bal, minWbal: minWbal };
+        }
+    };
+}
+
+// Separate workout simulation functions. Alla returnerar { finalWbal, minWbal }:
+// finalWbal är doseringen, minWbal avgör om passet går att fullfölja (WB-1).
+function simulatePyramidWorkout(template, power, CP, W_prime, tau, restPower) {
+    const sim = createSimulation(CP, W_prime, tau, restPower);
 
     for (let idx = 0; idx < template.pyramid.length; idx++) {
-        const duration = template.pyramid[idx];
-        // Work
-        const W_depleted = (power - CP) * duration;
-        W_bal -= W_depleted;
+        sim.work(power, template.pyramid[idx]);
 
         // Rest (not after last)
         if (idx < template.pyramid.length - 1) {
-            const recoveryFactor = (CP - restPower) / CP;
-            W_bal = calculateWPrimeRecovery(W_prime, W_bal, template.rest, tau, recoveryFactor);
+            sim.rest(template.rest);
         }
     }
 
-    return W_bal;
+    return sim.result();
 }
 
 function simulateMixedWorkout(template, power, CP, W_prime, tau, restPower) {
-    let W_bal = W_prime;
+    const sim = createSimulation(CP, W_prime, tau, restPower);
     const pattern = template.mixed[0];
+    const miniRest = 30; // 30s between parts
 
     for (let rep = 0; rep < template.reps; rep++) {
         for (let idx = 0; idx < pattern.length; idx++) {
-            const duration = pattern[idx];
-            // Work
-            const W_depleted = (power - CP) * duration;
-            W_bal -= W_depleted;
+            sim.work(power, pattern[idx]);
 
             // Mini rest between parts
             if (idx < pattern.length - 1) {
-                const recoveryFactor = (CP - restPower) / CP;
-                const miniRest = 30; // 30s between parts
-                W_bal = calculateWPrimeRecovery(W_prime, W_bal, miniRest, tau, recoveryFactor);
+                sim.rest(miniRest);
             }
         }
 
         // Main rest after full pattern
         if (rep < template.reps - 1) {
-            const recoveryFactor = (CP - restPower) / CP;
-            W_bal = calculateWPrimeRecovery(W_prime, W_bal, template.rest, tau, recoveryFactor);
+            sim.rest(template.rest);
         }
     }
 
-    return W_bal;
+    return sim.result();
 }
 
 function simulateTabataWorkout(template, power, CP, W_prime, tau, restPower) {
-    let W_bal = W_prime;
+    const sim = createSimulation(CP, W_prime, tau, restPower);
 
     for (let set = 0; set < template.sets; set++) {
         for (let rep = 0; rep < template.reps; rep++) {
-            // Work
-            const W_depleted = (power - CP) * template.work;
-            W_bal -= W_depleted;
+            sim.work(power, template.work);
 
             // Rest within set (not after last rep)
             if (rep < template.reps - 1) {
-                const recoveryFactor = (CP - restPower) / CP;
-                W_bal = calculateWPrimeRecovery(W_prime, W_bal, template.rest, tau, recoveryFactor);
+                sim.rest(template.rest);
             }
         }
 
         // Set rest (not after last set)
         if (set < template.sets - 1) {
-            const recoveryFactor = (CP - restPower) / CP;
-            W_bal = calculateWPrimeRecovery(W_prime, W_bal, template.setRest, tau, recoveryFactor);
+            sim.rest(template.setRest);
         }
     }
 
-    return W_bal;
+    return sim.result();
 }
 
 function simulateStandardWorkout(template, power, CP, W_prime, tau, restPower) {
-    let W_bal = W_prime;
+    const sim = createSimulation(CP, W_prime, tau, restPower);
 
     for (let i = 0; i < template.reps; i++) {
-        // Work
-        const W_depleted = (power - CP) * template.work;
-        W_bal -= W_depleted;
+        sim.work(power, template.work);
 
         // Rest (not after last)
         if (i < template.reps - 1) {
-            const recoveryFactor = (CP - restPower) / CP;
-            W_bal = calculateWPrimeRecovery(W_prime, W_bal, template.rest, tau, recoveryFactor);
+            sim.rest(template.rest);
         }
     }
 
-    return W_bal;
+    return sim.result();
 }
 
 function simulateWorkout(template, power, CP, W_prime, tau, restPower) {
@@ -161,7 +169,7 @@ function calculateWorkout(template, CP, W_prime, tau, targetWbal) {
     let optimalPower = (minPower + maxPower) / 2;
 
     for (let i = 0; i < 30; i++) {
-        const finalWbal = simulateWorkout(template, optimalPower, CP, W_prime, tau, restPower);
+        const finalWbal = simulateWorkout(template, optimalPower, CP, W_prime, tau, restPower).finalWbal;
 
         if (Math.abs(finalWbal - targetWbal) < 100) {
             break;
@@ -179,12 +187,18 @@ function calculateWorkout(template, CP, W_prime, tau, targetWbal) {
     // Calculate total work time and duration
     const stats = calculateWorkoutStats(template);
 
+    // Utfallet mäts på den oavrundade effekten - det är den siffran
+    // docs/12-omskrivning-wbal.md tabellerar.
+    const outcome = simulateWorkout(template, optimalPower, CP, W_prime, tau, restPower);
+
     return {
         name: template.name,
         type: template.type,
         power: Math.round(optimalPower),
         percentage: Math.round(optimalPower / CP * 100),
         restPower: Math.round(restPower),
+        finalWbal: outcome.finalWbal,
+        minWbal: outcome.minWbal,
         template: template,
         stats: stats
     };

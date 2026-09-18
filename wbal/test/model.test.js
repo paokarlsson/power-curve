@@ -21,8 +21,12 @@ const W_PRIME = 15000;
 const TAU = 180;
 const TARGET_WBAL = W_PRIME * 0.30;
 
-function finalWbalAt(template, power) {
+function simulateAt(template, power) {
     return model.simulateWorkout(template, power, CP, W_PRIME, TAU, CP * template.restPercent);
+}
+
+function finalWbalAt(template, power) {
+    return simulateAt(template, power).finalWbal;
 }
 
 function templateByName(name) {
@@ -85,6 +89,35 @@ test('slut-W-prime-bal sjunker monotont med föreskriven effekt, för varje mall
     }
 });
 
+test('lägsta W-prime-bal ligger aldrig över slutvärdet, för varje mall', () => {
+    // Sista arbetsintervallet följs inte av vila, så slutvärdet är självt en av
+    // bottnarna: min kan aldrig vara högre.
+    for (const template of model.workoutTemplates) {
+        const outcome = simulateAt(template, CP * 1.2);
+        assert.ok(outcome.minWbal <= outcome.finalWbal, `${template.name}: min ${outcome.minWbal} > slut ${outcome.finalWbal}`);
+    }
+});
+
+test('lägsta W-prime-bal sjunker monotont med föreskriven effekt, för varje mall', () => {
+    for (const template of model.workoutTemplates) {
+        let previous = Infinity;
+        for (const power of [CP, CP * 1.05, CP * 1.2, CP * 1.35, CP * 1.5]) {
+            const minWbal = simulateAt(template, power).minWbal;
+            assert.ok(minWbal < previous, `${template.name} vid ${power} W: ${minWbal} J`);
+            previous = minWbal;
+        }
+    }
+});
+
+test('båda pyramiderna har sin bottennivå strikt under slutvärdet', () => {
+    // Test 5 i docs/12 §Regressionstest. Pyramiderna är de enda mallarna där
+    // bottennivån ligger mitt i passet - det är hela skälet till WB-1.
+    for (const name of ['Pyramid 1-2-3-4-3-2-1', 'Pyramid 2-4-6-4-2']) {
+        const workout = model.calculateAllWorkouts(CP, W_PRIME, TAU, TARGET_WBAL).find(w => w.name === name);
+        assert.ok(workout.minWbal < workout.finalWbal - 1, `${name}: min ${workout.minWbal}, slut ${workout.finalWbal}`);
+    }
+});
+
 test('passiv vila återvinner mer än 98 % av W-prime på 30 minuter', () => {
     // Test 1 i docs/12 §Regressionstest. Kriteriet är valt så att det håller för
     // CP 150-350 W, se docs/12 §1 [Justerat].
@@ -106,27 +139,29 @@ test('solvern håller sig inom sitt sökintervall', () => {
 // ---------------------------------------------------------------------------
 
 // CP 200 W, W' 15 kJ, mål-W'bal 30 % (= 4500 J), τ = 180 s.
+// Kolumnerna är [mall, effekt, procent av CP, min(W'bal)]. min mäts på den
+// oavrundade lösningen, precis som tabellen i docs/12.
 const IDAG = [
-    ['4×4 min', 218, 109],
-    ['5×5 min', 213, 106],
-    ['6×3 min', 217, 109],
-    ['8×2 min', 221, 110],
-    ['3×8 min', 210, 105],
-    ['4×6 min', 211, 105],
-    ['2×10 min', 210, 105],
-    ['10×90s', 221, 111],
-    ['12×1 min', 233, 117],
-    ['15×1 min', 226, 113],
-    ['20×30s', 237, 119],
-    ['12×45s', 238, 119],
-    ['10×1 min', 244, 122],
-    ['8×(8×20s)', 243, 122],
-    ['3×(10×40s)', 224, 112],
-    ['Pyramid 1-2-3-4-3-2-1', 217, 108],
-    ['Pyramid 2-4-6-4-2', 216, 108],
-    ['5×(2min + 1min)', 221, 110],
-    ['4×(3min + 2min)', 215, 107],
-    ['2×15 min', 210, 105]
+    ['4×4 min', 218, 109, 4480],
+    ['5×5 min', 213, 106, 4517],
+    ['6×3 min', 217, 109, 4554],
+    ['8×2 min', 221, 110, 4462],
+    ['3×8 min', 210, 105, 4402],
+    ['4×6 min', 211, 105, 4510],
+    ['2×10 min', 210, 105, 4593],
+    ['10×90s', 221, 111, 4433],
+    ['12×1 min', 233, 117, 4537],
+    ['15×1 min', 226, 113, 4566],
+    ['20×30s', 237, 119, 4576],
+    ['12×45s', 238, 119, 4414],
+    ['10×1 min', 244, 122, 4467],
+    ['8×(8×20s)', 243, 122, 4493],
+    ['3×(10×40s)', 224, 112, 4459],
+    ['Pyramid 1-2-3-4-3-2-1', 217, 108, 4023],
+    ['Pyramid 2-4-6-4-2', 216, 108, 3787],
+    ['5×(2min + 1min)', 221, 110, 4466],
+    ['4×(3min + 2min)', 215, 107, 4460],
+    ['2×15 min', 210, 105, -155]
 ];
 
 test('alla 20 mallar ger kolumnen "Idag" på defaultvärden', () => {
@@ -134,10 +169,11 @@ test('alla 20 mallar ger kolumnen "Idag" på defaultvärden', () => {
     assert.equal(workouts.length, IDAG.length);
 
     for (let i = 0; i < IDAG.length; i++) {
-        const [name, power, percentage] = IDAG[i];
+        const [name, power, percentage, minWbal] = IDAG[i];
         assert.equal(workouts[i].name, name, `mall ${i} heter ${workouts[i].name}`);
         assert.equal(workouts[i].power, power, `${name}: effekt`);
         assert.equal(workouts[i].percentage, percentage, `${name}: procent av CP`);
+        assert.equal(Math.round(workouts[i].minWbal), minWbal, `${name}: min(W'bal)`);
     }
 });
 
