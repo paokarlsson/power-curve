@@ -136,6 +136,27 @@
             margin-top: 4px;
         }
 
+        .message {
+            background: #3a2d10;
+            border-left: 4px solid #FBBF24;
+            padding: 14px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .message.hidden {
+            display: none;
+        }
+
+        .stat-note {
+            font-size: 0.7rem;
+            opacity: 0.85;
+            margin-top: 6px;
+            font-style: italic;
+        }
+
         .predictions {
             background: #2a2a2a;
             padding: 25px;
@@ -185,6 +206,29 @@
             font-size: 0.9rem;
             color: #9CA3AF;
             margin-top: 5px;
+        }
+
+        .prediction-item.outside-domain {
+            background: #141414;
+            border: 1px dashed #4B5563;
+        }
+
+        .prediction-item.outside-domain .prediction-distance {
+            color: #9CA3AF;
+        }
+
+        .prediction-mark {
+            font-size: 0.7rem;
+            line-height: 1.3;
+            color: #FBBF24;
+            margin-top: 8px;
+        }
+
+        .prediction-legend {
+            margin-top: 18px;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            color: #9CA3AF;
         }
 
         .chart-card {
@@ -272,21 +316,27 @@
             </div>
         </div>
 
+        <!-- Meddelanden om indata -->
+        <div id="message" class="message hidden"></div>
+
         <!-- Stats Section -->
         <div class="stats-grid">
             <div class="stat-card green">
                 <div class="stat-label">CS (Critical Speed)</div>
                 <div class="stat-value" id="csKmh">-</div>
                 <div class="stat-sub" id="csPace">-</div>
+                <div class="stat-note" id="csSpan">-</div>
             </div>
             <div class="stat-card cyan">
                 <div class="stat-label">D' (Anaerob kapacitet)</div>
                 <div class="stat-value" id="dPrime">-</div>
+                <div class="stat-sub" id="dPrimeSpan">-</div>
             </div>
             <div class="stat-card purple">
-                <div class="stat-label">Maximal distans (1h)</div>
+                <div class="stat-label">Maximal distans (30 min)</div>
                 <div class="stat-value" id="maxDist">-</div>
                 <div class="stat-sub" id="maxDistKm">-</div>
+                <div class="stat-note">ett tak, inte en prognos</div>
             </div>
         </div>
 
@@ -298,6 +348,27 @@
                     <div class="prediction-distance">Laddar...</div>
                 </div>
             </div>
+            <p class="prediction-legend" id="predictionLegend">
+                CS-modellen är validerad för insatser på ungefär <strong>2–15 minuter</strong>.
+                Prediktioner inom den domänen visas som vanligt; de som ligger utanför är
+                <span style="color: #9CA3AF">streckade och gråmarkerade</span> och ska läsas med
+                markeringen på kortet. Talen är desamma - det är tilliten till dem som skiljer.
+            </p>
+            <p class="prediction-legend">
+                <strong style="color: white">Kort ände (800 m, 1500 m):</strong> v(t) = CS + D′/t går mot oändligheten när
+                t → 0, så modellen har ingen övre hastighetsgräns och kan per definition inte beskriva sprintdistanser.
+                D′ skattat ur insatser på 3-20 minuter fångar dessutom inte den neuromuskulära kapacitet som avgör
+                800 m. Tiderna kan se rimliga ut, men de är extrapolationer utanför modellen - läs dem som
+                <strong>"minst så snabbt"</strong>.
+            </p>
+            <p class="prediction-legend">
+                <strong style="color: white">Lång ände (halvmara, mara):</strong> modellen låter tempot närma sig CS
+                <em>uppifrån</em>, så den predikterade hastigheten är alltid snabbare än CS - för varje distans.
+                Verkligheten är den omvända: maraton springs <em>under</em> CS, eftersom substrattillgång,
+                värmereglering och muskelskada begränsar långt innan den aeroba kapaciteten gör det. Ingen av de
+                mekanismerna finns i modellen, så felet är strukturellt och åt ett enda håll, och det växer med
+                distansen. Läs de långa tiderna som <strong>"aldrig snabbare än så här"</strong>.
+            </p>
         </div>
 
         <!-- Charts Section -->
@@ -320,6 +391,7 @@
             <p id="point2Info">• Punkt 2: -</p>
             <p id="csInfo">• CS: -</p>
             <p id="dprimeInfo">• D': -</p>
+            <p id="sensitivityInfo">• Känslighet: -</p>
         </div>
     </div>
 
@@ -339,9 +411,12 @@
 
         function formatPace(metersPerSec) {
             if (metersPerSec <= 0) return '0:00/km';
-            const secsPerKm = 1000 / metersPerSec;
+            // Avrunda sekunderna per kilometer först och dela sedan upp. Att runda
+            // resten för sig gav 3:60/km, eftersom 239,9999 s/km blev 3 minuter och
+            // 60 sekunder i stället för 4:00.
+            const secsPerKm = Math.round(1000 / metersPerSec);
             const mins = Math.floor(secsPerKm / 60);
-            const secs = Math.round(secsPerKm % 60);
+            const secs = secsPerKm % 60;
             return `${mins}:${secs.toString().padStart(2, '0')}/km`;
         }
 
@@ -357,6 +432,58 @@
             return `${mins}:${secs.toString().padStart(2, '0')}`;
         }
 
+        // Hur mycket CS och D′ rör sig av ett tidsmätfel på loppen. Tvåpunktsmetoden
+        // ger exakt en lösning utan residual, så det här är det enda sättet att se
+        // hur mycket man får lita på tredje värdesiffran (RUN-3).
+        const TIME_ERROR = 5; // sekunder
+
+        function sensitivity(d1, t1, d2, t2) {
+            let csMin = Infinity, csMax = -Infinity;
+            let dpMin = Infinity, dpMax = -Infinity;
+
+            [-TIME_ERROR, TIME_ERROR].forEach(e1 => {
+                [-TIME_ERROR, TIME_ERROR].forEach(e2 => {
+                    const T1 = t1 + e1;
+                    const T2 = t2 + e2;
+                    if (T1 <= 0 || T2 <= 0 || T1 === T2) return;
+
+                    const cs = (d2 - d1) / (T2 - T1);
+                    const dp = d1 - cs * T1;
+                    csMin = Math.min(csMin, cs);
+                    csMax = Math.max(csMax, cs);
+                    dpMin = Math.min(dpMin, dp);
+                    dpMax = Math.max(dpMax, dp);
+                });
+            });
+
+            return {
+                csKmh: (csMax - csMin) * 3.6 / 2,
+                dprime: (dpMax - dpMin) / 2
+            };
+        }
+
+        function showMessage(html) {
+            const box = document.getElementById('message');
+            box.innerHTML = html;
+            box.classList.remove('hidden');
+        }
+
+        function clearMessage() {
+            const box = document.getElementById('message');
+            box.textContent = '';
+            box.classList.add('hidden');
+        }
+
+        // Inga siffror alls hellre än siffror som inte hör ihop med inmatningen -
+        // samma regel som power-curve/ följer när indata avvisas.
+        function blankStats() {
+            ['csKmh', 'csPace', 'csSpan', 'dPrime', 'dPrimeSpan', 'maxDist', 'maxDistKm',
+                'point1Info', 'point2Info', 'csInfo', 'dprimeInfo', 'sensitivityInfo'].forEach(id => {
+                document.getElementById(id).textContent = '-';
+            });
+            document.getElementById('predictionGrid').innerHTML = '';
+        }
+
         function calculate() {
             try {
                 const d1 = parseFloat(r1DistInput.value) || 0;
@@ -365,7 +492,10 @@
                 const t2 = parseFloat(r2TimeInput.value) || 0;
 
                 if (d1 <= 0 || t1 <= 0 || d2 <= 0 || t2 <= 0 || t1 === t2) {
-                    console.log('Invalid input values');
+                    showMessage(t1 === t2 && t1 > 0
+                        ? '<strong>Loppen måste ha olika tid.</strong> CS är lutningen mellan två punkter i distans–tid-planet, och två lopp på samma tid definierar ingen lutning.'
+                        : '<strong>Ofullständig inmatning.</strong> Distans och tid måste vara positiva tal för båda loppen.');
+                    blankStats();
                     return;
                 }
 
@@ -379,15 +509,21 @@
                 // Convert CS to km/h
                 const CS_kmh = CS * 3.6;
 
-                // Max distance in 1 hour
-                const maxDist1h = CS * 3600 + Dprime;
+                const separation = Math.abs(t2 - t1);
+                const span = sensitivity(d1, t1, d2, t2);
+
+                // Den linjära formen används rakt, precis som avsedd, men en timme är
+                // fyra gånger den övre gränsen för modellens domän (~15 min) och ärver
+                // därmed hela den optimistiska biasen från de långa prediktionerna.
+                // 30 min ligger nära domänen och ger ett tal som går att läsa (RUN-4).
+                const maxDist30min = CS * 1800 + Dprime;
 
                 // Update stats
                 document.getElementById('csKmh').textContent = `${CS_kmh.toFixed(1)} km/h`;
                 document.getElementById('csPace').textContent = formatPace(CS);
                 document.getElementById('dPrime').textContent = `${Math.round(Dprime)}m`;
-                document.getElementById('maxDist').textContent = `${Math.round(maxDist1h)}m`;
-                document.getElementById('maxDistKm').textContent = `${(maxDist1h / 1000).toFixed(2)} km`;
+                document.getElementById('maxDist').textContent = `${Math.round(maxDist30min)}m`;
+                document.getElementById('maxDistKm').textContent = `${(maxDist30min / 1000).toFixed(2)} km`;
 
                 // Update info text
                 document.getElementById('point1Info').innerHTML = 
@@ -398,6 +534,28 @@
                     `• <span style="color: #10B981">CS (${CS_kmh.toFixed(1)} km/h = ${formatPace(CS)})</span> = Lutningen på kurvan`;
                 document.getElementById('dprimeInfo').innerHTML = 
                     `• <span style="color: #06B6D4">D' (${Math.round(Dprime)}m)</span> = Y-intercept på kurvan (anaerob reserv)`;
+                document.getElementById('sensitivityInfo').innerHTML =
+                    `• <span style="color: #FBBF24">Känslighet:</span> två punkter ger exakt en lösning, alltså ingen
+                     residual och ingen konfidens. Med ${TIME_ERROR} s mätfel på loppen rör sig CS
+                     ±${span.csKmh.toFixed(2)} km/h och D′ ±${Math.round(span.dprime)} m - tredje
+                     värdesiffran är fiktion.`;
+
+                // Separationen mellan loppen avgör hur mycket lutningen svänger av ett
+                // mätfel. Samma geometri som gör ett långt sikte mer precist än ett kort.
+                document.getElementById('csSpan').textContent =
+                    `±${span.csKmh.toFixed(2)} km/h vid ${TIME_ERROR} s mätfel`;
+                document.getElementById('dPrimeSpan').textContent =
+                    `±${Math.round(span.dprime)}m vid ${TIME_ERROR} s mätfel`;
+
+                if (separation < 180) {
+                    showMessage(`<strong>Loppen ligger bara ${Math.round(separation)} s ifrån varandra i tid.</strong>
+                        CS är lutningen mellan två punkter, så ju närmare loppen ligger på tidsaxeln desto mer svänger
+                        skattningen av ett litet mätfel: här flyttar ${TIME_ERROR} s fel CS ±${span.csKmh.toFixed(2)} km/h
+                        och D′ ±${Math.round(span.dprime)} m. Välj två lopp med <strong>minst 3 minuters skillnad</strong>
+                        i tid - verktygets defaultvärden, 180 s och 1200 s, är ett bra exempel.`);
+                } else {
+                    clearMessage();
+                }
 
                 // Generate predictions
                 generatePredictions(CS, Dprime);
@@ -410,15 +568,24 @@
             }
         }
 
+        // Vad markeringen betyder i respektive ände av domänen.
+        const DOMAIN_MARKS = {
+            short: 'utanför giltigheten – läs som <strong>"minst så snabbt"</strong>',
+            long: 'utanför giltigheten – läs som ett <strong>tak</strong>, aldrig som en prognos'
+        };
+
         function generatePredictions(CS, Dprime) {
+            // Läsregeln ur docs/02-critical-speed.md §3: lita på 3 km-10 km, läs
+            // 800 m/1500 m som "minst så snabbt" och halvmara/mara som "aldrig
+            // snabbare än så här". Domänen är modellens, ~2-15 min.
             const distances = [
-                { name: '800m', meters: 800 },
-                { name: '1500m', meters: 1500 },
-                { name: '3K', meters: 3000 },
-                { name: '5K', meters: 5000 },
-                { name: '10K', meters: 10000 },
-                { name: 'Halvmara', meters: 21097.5 },
-                { name: 'Mara', meters: 42195 }
+                { name: '800m', meters: 800, domain: 'short' },
+                { name: '1500m', meters: 1500, domain: 'short' },
+                { name: '3K', meters: 3000, domain: 'trusted' },
+                { name: '5K', meters: 5000, domain: 'trusted' },
+                { name: '10K', meters: 10000, domain: 'trusted' },
+                { name: 'Halvmara', meters: 21097.5, domain: 'long' },
+                { name: 'Mara', meters: 42195, domain: 'long' }
             ];
 
             const grid = document.getElementById('predictionGrid');
@@ -432,11 +599,14 @@
                     const pace = formatPace(dist.meters / time);
                     
                     const item = document.createElement('div');
-                    item.className = 'prediction-item';
+                    item.className = dist.domain === 'trusted'
+                        ? 'prediction-item'
+                        : 'prediction-item outside-domain';
                     item.innerHTML = `
                         <div class="prediction-distance">${dist.name}</div>
                         <div class="prediction-time">${formatRaceTime(time)}</div>
                         <div class="prediction-pace">${pace}</div>
+                        ${dist.domain === 'trusted' ? '' : `<div class="prediction-mark">${DOMAIN_MARKS[dist.domain]}</div>`}
                     `;
                     grid.appendChild(item);
                 }

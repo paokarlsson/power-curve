@@ -10,46 +10,104 @@ const CONFIG = {
     DEFAULT_POWER_EXPONENT: 4, // Power exponent for NP calculations
 
     // Data processing constants
-    MIN_POWER_DROPOUT: 30,      // Minimum power value for dropout replacement
-    WINDOW_COVERAGE_THRESHOLD: 0.5 // Minimum coverage ratio for window averaging
+    WINDOW_COVERAGE_THRESHOLD: 0.5, // Minimum share of a window that must be covered by samples
+    RESAMPLE_HZ: 1                  // NP är definierad på 1-sekundersdata
 };
 
-// Dynamic TSS configurations - can be modified at runtime
-let TSS_CONFIGS = {
-        SPRINT: {
-            seconds: 10,
-            displayKey: 'tenSecond',
-            elementId: 'tssSprint',
-            label: 'TSS (Sprint)',
-            chartColor: '#f57c00',
-            chartBackground: '#fff3e0'
-        },
-        VO2_MAX: {
-            seconds: 180,
-            displayKey: 'threeMinute',
-            elementId: 'tssVo2Max',
-            label: 'TSS (VO2max)',
-            chartColor: '#388e3c',
-            chartBackground: '#e8f5e8'
-        },
-        THRESHOLD: {
-            seconds: 600,
-            displayKey: 'tenMinute',
-            elementId: 'tssThreshold',
-            label: 'TSS (Threshold)',
-            chartColor: '#1976d2',
-            chartBackground: '#e3f2fd'
-        },
-        STANDARD: {
-            seconds: 30, // Fixed 30-second standard
-            displayKey: 'standard',
-            elementId: 'tssStandard',
-            label: 'TSS (Standard)',
-            chartColor: '#7b1fa2',
-            chartBackground: '#f3e5f5',
-            fixed: true // Cannot be edited or removed
-        }
+// En standardinställning ska ha exakt en definition. Både initieringen och
+// resetTSSConfigs() läser härifrån, och kopierar vid tilldelning så att reset
+// verkligen återställer i stället för att dela referens (FA-9).
+// Fönsterlängden är ett lågpassfilter på effektsignalen: den väljer vilken
+// tidsskala av variabilitet som mäts, inte vilket energisystem som belastades.
+// Namnen är därför neutrala (FA-4) - ett 10-sekundersfönster ger en siffra även
+// på ett pass utan en enda sprint, och "TSS (Sprint)" inbjöd till slutsatsen att
+// siffran säger något om det anaeroba systemet. Ordnade efter fönsterlängd, så
+// spektrumet läses från kort till långt.
+const DEFAULT_TSS_CONFIGS = {
+    W10: {
+        seconds: 10,
+        displayKey: 'w10',
+        elementId: 'tssW10',
+        label: 'TSS@10s',
+        chartColor: '#f57c00',
+        chartBackground: '#fff3e0'
+    },
+    W30: {
+        seconds: 30, // Coggans standardfönster - det enda med en publicerad definition
+        displayKey: 'w30',
+        elementId: 'tssW30',
+        label: 'TSS@30s (referens)',
+        chartColor: '#7b1fa2',
+        chartBackground: '#f3e5f5',
+        fixed: true, // Cannot be edited or removed
+        reference: true // Jämförbar med Strava, TrainingPeaks och WKO (FA-5)
+    },
+    W180: {
+        seconds: 180,
+        displayKey: 'w180',
+        elementId: 'tssW180',
+        label: 'TSS@180s',
+        chartColor: '#388e3c',
+        chartBackground: '#e8f5e8'
+    },
+    W600: {
+        seconds: 600,
+        displayKey: 'w600',
+        elementId: 'tssW600',
+        label: 'TSS@600s',
+        chartColor: '#1976d2',
+        chartBackground: '#e3f2fd'
+    },
+    // NP med ett oändligt långt fönster är medeleffekten, så baslinjen är
+    // spektrumets nedre asymptot - den nivå alla fönstervärden konvergerar mot.
+    // Sentinelvärdet -1 aktiverar den färdiga grenen i computeNP_by_time (FA-8).
+    BASE: {
+        seconds: -1,
+        displayKey: 'base',
+        elementId: 'tssBase',
+        label: 'Base TSS (medeleffekt)',
+        chartColor: '#546e7a',
+        chartBackground: '#eceff1',
+        fixed: true // Cannot be edited or removed
+    }
 };
+
+function createDefaultTSSConfigs() {
+    const configs = {};
+    Object.entries(DEFAULT_TSS_CONFIGS).forEach(([key, config]) => {
+        configs[key] = { ...config };
+    });
+    return configs;
+}
+
+// Dynamic TSS configurations - can be modified at runtime
+let TSS_CONFIGS = createDefaultTSSConfigs();
+
+// Passmålen anges relativt FTP (FA-6). TSS är per definition redan normaliserad
+// mot FTP, så ett pass som beskrivs relativt får en planerad TSS som är identisk
+// för alla atleter - vilket är precis vad man vill när pass delas eller
+// återanvänds. Absoluta watt knöt passet till en atlet vid en tidpunkt:
+// exempelpasset "4x4 Threshold" föreskrev 250 W, alltså 125 % av standard-FTP
+// 200 W, vilket är VO2max-intensitet och inte tröskel.
+//
+// targetPercent: 0 är tillåtet så att äkta vila går att uttrycka. Det förutsätter
+// att 30 W-golvet är borta (7.2), annars räknas vilan ändå som 30 W och ändringen
+// ser ut att fungera utan att göra någon skillnad.
+function segmentPercent(target, ftp) {
+    if (!target) return 0;
+    if (typeof target.targetPercent === 'number') return target.targetPercent;
+    // Äldre passfiler med absoluta watt läses fortfarande
+    if (typeof target.targetWatt === 'number') return ftp > 0 ? target.targetWatt / ftp : 0;
+    return 0;
+}
+
+function segmentWatt(target, ftp) {
+    return Math.round(segmentPercent(target, ftp) * ftp);
+}
+
+function currentFTP() {
+    return parseInt(document.getElementById('ftpInput').value) || CONFIG.DEFAULT_FTP;
+}
 
 // Function to get current TSS window seconds array
 function getTSSWindowSeconds() {
@@ -238,6 +296,7 @@ function recalculateTSS(powerRecords, ftp) {
             minutes: Math.round(tssData.duration / 60),
             hours: Math.round(tssData.duration / 3600 * 10) / 10
         },
+        cleaning: tssData.cleaning,
         windows: {}
     };
 
@@ -249,9 +308,7 @@ function recalculateTSS(powerRecords, ftp) {
     console.log('TSS Results:', tssResults);
 
     // Update TSS display values for all current configs
-    Object.keys(TSS_CONFIGS).forEach(windowType => {
-        updateTSSElement(windowType, tssResults);
-    });
+    updateTSSDisplayValues(tssResults);
 
     // Recalculate and update TSS accumulation chart
     const tssAccumulation = calculateTSSAccumulation(powerData, ftp, powerExponent);
@@ -297,7 +354,9 @@ function plotData(hrRecords, powerRecords, ftp) {
         const startTime = new Date(powerRecords[0].timestamp);
         const powerData = powerRecords.map(r => ({
             t: (new Date(r.timestamp) - startTime) / 1000, // seconds from start
-            p: r.power || 0
+            p: r.power || 0,
+            cadence: r.cadence,   // avgör om en nolla är bortfall eller frihjulning
+            speed: r.speed
         }));
 
         // Get current power exponent from input
@@ -313,6 +372,7 @@ function plotData(hrRecords, powerRecords, ftp) {
                 minutes: Math.round(tssData.duration / 60),
                 hours: Math.round(tssData.duration / 3600 * 10) / 10
             },
+            cleaning: tssData.cleaning,
             windows: {}
         };
 
@@ -583,7 +643,7 @@ function plotTSSAccumulation(tssData) {
                 data: tssData.timestamps.map((time, i) => ({ x: time, y: tssData[config.elementId][i] })),
                 borderColor: config.chartColor,
                 backgroundColor: hexToRgba(config.chartColor, 0.1),
-                borderWidth: windowType === 'SPRINT' ? 3 : 2,
+                borderWidth: config.reference ? 3 : 2,
                 tension: 0.4,
                 fill: false,
                 pointRadius: 0,
@@ -685,17 +745,16 @@ function updateStats(hrRecords, powerRecords, timestamps, tssResults) {
 
     // TSS stats
     if (tssResults) {
-        // Update all TSS values for current configs
-        Object.keys(TSS_CONFIGS).forEach(windowType => {
-            updateTSSElement(windowType, tssResults);
-        });
-
+        updateTSSDisplayValues(tssResults);
+        updateCleaningNote(tssResults.cleaning);
         document.getElementById('tssStats').style.display = 'grid';
     } else {
         // Clear all TSS values when no results available
         Object.keys(TSS_CONFIGS).forEach(windowType => {
             updateElementText(TSS_CONFIGS[windowType].elementId, '--');
         });
+        updateElementText('tssSpread', '--');
+        updateCleaningNote(null);
         document.getElementById('tssStats').style.display = 'none';
     }
 }
@@ -738,6 +797,85 @@ function updateElementText(elementId, value) {
     }
 }
 
+// Variabilitetsindex: skillnaden mellan kortaste och längsta fönstret (FA-4).
+// Ett kort fönster låter topparna överleva utjämningen, ett långt slätar ut dem och
+// konvergerar mot medeleffekten - alltså mäter avståndet mellan dem hur ojämnt
+// passet var. All data finns redan beräknad; det är spektrumets läsvärde.
+function calculateVariabilitySpread(tssResults) {
+    const windows = Object.values(TSS_CONFIGS).filter(config => config.seconds > 0);
+    if (windows.length < 2) return null;
+
+    const shortest = windows.reduce((a, b) => (a.seconds <= b.seconds ? a : b));
+    const longest = windows.reduce((a, b) => (a.seconds >= b.seconds ? a : b));
+
+    const shortData = tssResults.windows[shortest.displayKey];
+    const longData = tssResults.windows[longest.displayKey];
+    if (!shortData?.available || !longData?.available) return null;
+
+    return {
+        spread: shortData.tss - longData.tss,
+        shortSeconds: shortest.seconds,
+        longSeconds: longest.seconds
+    };
+}
+
+// Läsregeln ur docs/10-fel-fit-analysis.md FA-4.
+function readVariabilitySpread(spread) {
+    if (spread < 5) return 'jämnt distans- eller tempopass, dosen är aerob';
+    if (spread <= 20) return 'strukturerade långa intervaller, måttlig variabilitet';
+    if (spread <= 40) return 'tydlig variabilitet, mellan de dokumenterade banden';
+    return 'kort, hård, intermittent belastning – den anaeroba kostnaden dominerar';
+}
+
+// Uppdatera samtliga TSS-rutor plus spridningen. Både omräkningen och
+// statistikpanelen går genom den här, så de kan inte glida ifrån varandra.
+// Säg vad koden gjorde med nollorna. Tolkningen är hela poängen med FA-1: en
+// frihjulad nolla och ett sensorbortfall ser identiska ut i effektserien, och
+// valet mellan dem flyttar TSS.
+function updateCleaningNote(cleaning) {
+    const note = document.getElementById('cleaningNote');
+    if (!note) return;
+
+    if (!cleaning) {
+        note.textContent = '';
+        return;
+    }
+
+    const parts = [];
+    if (cleaning.interpolated > 0) {
+        parts.push(`${cleaning.interpolated} nollor tolkade som sensorbortfall och interpolerade`);
+    }
+    if (cleaning.zerosKept > 0) {
+        parts.push(`${cleaning.zerosKept} nollor behållna som data (frihjulning eller stillastående)`);
+    }
+    if (parts.length === 0) {
+        note.textContent = 'Inga nollvärden i filen.';
+        return;
+    }
+
+    const source = cleaning.cadenceDecided > 0
+        ? `${cleaning.cadenceDecided} av dem avgjorda med kadens ur filen`
+        : 'ingen kadenskanal i filen, så isolerade nollor räknas som bortfall och serier som frihjulning';
+
+    note.textContent = `Nollvärden: ${parts.join(', ')} – ${source}.`;
+}
+
+function updateTSSDisplayValues(tssResults) {
+    Object.keys(TSS_CONFIGS).forEach(windowType => {
+        updateTSSElement(windowType, tssResults);
+    });
+
+    const variability = calculateVariabilitySpread(tssResults);
+    if (variability) {
+        updateElementText('tssSpread', variability.spread.toFixed(1));
+        updateElementText('tssSpreadNote',
+            `TSS@${variability.shortSeconds}s − TSS@${variability.longSeconds}s: ${readVariabilitySpread(variability.spread)}`);
+    } else {
+        updateElementText('tssSpread', '--');
+        updateElementText('tssSpreadNote', 'kräver minst två beräknade fönster');
+    }
+}
+
 // Helper function to update TSS display values
 function updateTSSElement(windowType, tssResults) {
     const config = TSS_CONFIGS[windowType];
@@ -750,17 +888,51 @@ function updateTSSElement(windowType, tssResults) {
         available: windowData?.available
     });
 
-    // Generate fallback text for unavailable data
-    let fallbackText = '--';
-    if (windowType === 'BASE') {
-        fallbackText = '--'; // Base TSS always shows simple fallback
-    } else if (windowType !== 'SPRINT') {
-        fallbackText = `N/A (<${config.seconds / 60}m)`;
-    }
+    // Fallbacktext när fönstret inte kunde beräknas: passet är kortare än fönstret.
+    // Uttryckt i fönsterlängd i stället för i en nyckel, så den följer med när
+    // fönstren konfigureras om.
+    const fallbackText = config.seconds > 0 ? `N/A (<${config.seconds}s)` : '--';
 
     const value = windowData?.available ? windowData.tss.toFixed(1) : fallbackText;
     console.log(`Setting element ${config.elementId} to value: ${value}`);
     updateElementText(config.elementId, value);
+}
+
+// Noll watt betyder tre olika saker, och effektserien ensam kan inte skilja dem
+// (FA-1). Kadensen kan:
+//
+//   0 W, kadens > 0  -> sensorbortfall: man trampar men mätaren registrerar inte
+//   0 W, kadens = 0  -> frihjulning eller stillastående: en äkta nolla
+//
+// Båda kanalerna finns i FIT-filen. Saknas kadens - CSV-import, eller en fil utan
+// kadensgivare - faller koden tillbaka på den gamla regeln: interpolera isolerade
+// nollor, behåll serier.
+function isSensorDropout(point) {
+    if (typeof point.cadence !== 'number') return null;
+    return point.cadence > 0;
+}
+
+// Linjär interpolation mellan närmaste positiva effekt före och efter.
+function interpolatePower(points, index) {
+    let before = null;
+    let after = null;
+
+    for (let i = index - 1; i >= 0; i--) {
+        if (points[i].p > 0) { before = points[i]; break; }
+    }
+    for (let i = index + 1; i < points.length; i++) {
+        if (points[i].p > 0) { after = points[i]; break; }
+    }
+
+    if (before && after) {
+        const span = after.t - before.t;
+        const share = span > 0 ? (points[index].t - before.t) / span : 0.5;
+        return before.p + (after.p - before.p) * share;
+    }
+
+    if (before) return before.p;
+    if (after) return after.p;
+    return 0;
 }
 
 // Robust data cleaning for interval training power data
@@ -780,48 +952,112 @@ function cleanPowerData(rawPowerData) {
         }
     }
 
-    // Step 2: Fix sensor dropouts (0W values)
-    const cleaned = [];
-    let zeroDropouts = 0;
+    // Step 2: Skilj sensorbortfall från äkta nollor, med kadens när den finns
+    const cleaned = deduped.map(point => ({ ...point }));
+    let interpolated = 0;
+    let zerosKept = 0;
+    let cadenceDecided = 0;
 
-    for (let i = 0; i < deduped.length; i++) {
-        const current = deduped[i];
+    for (let i = 0; i < cleaned.length; i++) {
+        if (cleaned[i].p !== 0) continue;
 
-        if (current.p === 0) {
-            zeroDropouts++;
+        const dropout = isSensorDropout(cleaned[i]);
+        let treatAsDropout;
+
+        if (dropout === null) {
+            // Ingen kadenskanal: bara isolerade nollor är sannolika bortfall
             const prevPower = i > 0 ? deduped[i - 1].p : 0;
             const nextPower = i < deduped.length - 1 ? deduped[i + 1].p : 0;
-
-            if (prevPower > 0 && nextPower > 0) {
-                // Interpolate isolated zeros
-                cleaned.push({ ...current, p: (prevPower + nextPower) / 2 });
-            } else {
-                // Use minimum viable power for other zeros
-                cleaned.push({ ...current, p: CONFIG.MIN_POWER_DROPOUT });
-            }
+            treatAsDropout = prevPower > 0 && nextPower > 0;
         } else {
-            cleaned.push(current);
+            treatAsDropout = dropout;
+            cadenceDecided++;
+        }
+
+        if (treatAsDropout) {
+            cleaned[i].p = interpolatePower(deduped, i);
+            interpolated++;
+        } else {
+            zerosKept++;
         }
     }
 
-    console.log(`🔧 Cleaned: ${sortedData.length} → ${deduped.length} → ${cleaned.length} points, fixed ${zeroDropouts} dropouts`);
-    return cleaned;
+    console.log(`🔧 Cleaned: ${sortedData.length} → ${deduped.length} points, ${interpolated} zeros interpolated as dropouts, ${zerosKept} kept as data (${cadenceDecided} decided by cadence)`);
+
+    return {
+        points: cleaned,
+        interpolated: interpolated,
+        zerosKept: zerosKept,
+        cadenceDecided: cadenceDecided
+    };
+}
+
+// Mediansamplingsintervallet, alltså hur tätt filen faktiskt spelar in.
+function medianInterval(powerData) {
+    const gaps = [];
+    for (let i = 1; i < powerData.length; i++) {
+        gaps.push(powerData[i].t - powerData[i - 1].t);
+    }
+    if (gaps.length === 0) return 1;
+
+    gaps.sort((a, b) => a - b);
+    return gaps[Math.floor(gaps.length / 2)];
+}
+
+// Resampla till 1 Hz före beräkningen (FA-2, den riktiga lösningen). Standard-NP
+// är definierad på 1-sekundersdata, och ett rullande medelvärde förutsätter jämnt
+// spridda punkter - med gles eller ojämn sampling räknar man i praktiken på något
+// annat än NP, oavsett hur täckningskravet formuleras. Efteråt betyder varje
+// fönsterlängd samma sak i alla filer, vilket är en förutsättning för att
+// fönsterspektrumet ska gå att jämföra mellan pass och enheter.
+//
+// Senaste värdet hålls över luckor upp till tre mediansamplingsintervall, vilket
+// är vad smart recording betyder: en punkt skrivs när värdet ändras. Större
+// luckor är pauser eller signalbortfall och lämnas tomma - då avvisar
+// täckningskravet de fönster som överlappar dem, i stället för att koden hittar
+// på effekt som aldrig mättes.
+function resampleTo1Hz(powerData) {
+    if (powerData.length < 2) return powerData;
+
+    const maxHold = Math.max(2, 3 * medianInterval(powerData));
+    const firstSecond = Math.ceil(powerData[0].t);
+    const lastSecond = Math.floor(powerData[powerData.length - 1].t);
+    const resampled = [];
+    let index = 0;
+
+    for (let t = firstSecond; t <= lastSecond; t++) {
+        while (index + 1 < powerData.length && powerData[index + 1].t <= t) {
+            index++;
+        }
+
+        const sample = powerData[index];
+        if (t - sample.t <= maxHold) {
+            resampled.push({ ...sample, t: t });
+        }
+    }
+
+    console.log(`🕐 Resampled to 1 Hz: ${powerData.length} → ${resampled.length} points (max hold ${maxHold}s)`);
+    return resampled;
 }
 
 function computeNP_by_time(rawPowerData, ftp, windowSecondsList = TSS_WINDOW_SECONDS, exponent = CONFIG.DEFAULT_POWER_EXPONENT) {
     if (!rawPowerData || rawPowerData.length < 2) throw new Error("Behöver minst två datapunkter med tidsstämplar.");
 
-    // Clean the data first
-    const powerData = cleanPowerData(rawPowerData);
+    // Clean the data first, then put it on a 1 Hz grid
+    const cleaning = cleanPowerData(rawPowerData);
+    const cleanedData = cleaning.points;
+    const powerData = resampleTo1Hz(cleanedData);
+
+    if (powerData.length < 2) throw new Error("Behöver minst två datapunkter med tidsstämplar.");
 
     // Basic stats
     const firstTs = powerData[0].t;
     const lastTs = powerData[powerData.length - 1].t;
     const duration = lastTs - firstTs;
     const samples = powerData.length;
-    const avgSamplingHz = samples / duration;
+    const sourceSamplingHz = cleanedData.length / (cleanedData[cleanedData.length - 1].t - cleanedData[0].t);
 
-    console.log('📊 Data stats:', samples, 'points over', duration.toFixed(1), 's, sampling:', avgSamplingHz.toFixed(2), 'Hz');
+    console.log('📊 Data stats:', samples, 'points over', duration.toFixed(1), 's, filens sampling:', sourceSamplingHz.toFixed(2), 'Hz');
 
     // Robust window averaging with fixed step size
     function robustWindowAverages(windowSec) {
@@ -830,11 +1066,17 @@ function computeNP_by_time(rawPowerData, ftp, windowSecondsList = TSS_WINDOW_SEC
         const averages = [];
         const stepSize = Math.max(1, Math.floor(windowSec / 60)); // Adaptive step size
 
+        // Täckningskravet är en kvot, och nu jämför den två storheter av samma slag:
+        // serien ligger på ett 1 Hz-rutnät, så förväntat antal punkter är
+        // fönsterlängden i sekunder. Bara äkta luckor - pauser och signalbortfall
+        // som resamplingen lämnade tomma - kan numera fälla ett fönster.
+        const minPoints = windowSec * CONFIG.RESAMPLE_HZ * CONFIG.WINDOW_COVERAGE_THRESHOLD;
+
         for (let start = firstTs; start + windowSec <= lastTs; start += stepSize) {
             const end = start + windowSec;
             const windowPoints = powerData.filter(p => p.t >= start && p.t < end);
 
-            if (windowPoints.length >= windowSec * CONFIG.WINDOW_COVERAGE_THRESHOLD) { // Need reasonable coverage
+            if (windowPoints.length >= minPoints) {
                 const avg = windowPoints.reduce((sum, p) => sum + p.p, 0) / windowPoints.length;
                 averages.push(avg);
             }
@@ -848,7 +1090,8 @@ function computeNP_by_time(rawPowerData, ftp, windowSecondsList = TSS_WINDOW_SEC
         duration,
         firstTs,
         lastTs,
-        avgSamplingHz,
+        sourceSamplingHz,
+        cleaning,
         windows: {}
     };
 
@@ -903,45 +1146,71 @@ function computeNP_by_time(rawPowerData, ftp, windowSecondsList = TSS_WINDOW_SEC
     return results;
 }
 
-// Calculate TSS accumulation over time for multiple time windows
+// Ackumulerad TSS över tid, räknad per bit av passet i stället för per prefix
+// (FA-3). Den gamla kurvan körde hela NP-beräkningen om från passets början vid
+// varje punkt, alltså en fullständig omanpassning över allt som hittills hänt. En
+// hård insats tidigt räknades då om mot ett växande underlag och fortsatte ge
+// tillskott långt efter att den var över: kurvan växte som roten ur tiden, för
+// alltid, även om atleten stannade helt.
+//
+// NP och TSS är definierade för ett helt pass, som en sammanfattning i efterhand,
+// inte som funktioner av förfluten tid. Här delas passet därför i bitar, varje bit
+// får sin egen dos beräknad isolerat, och bitarna summeras. Då är kurvan en äkta
+// löpande summa: varje minut bidrar en gång, och kurvan planar ut när arbetet
+// upphör.
+const ACCUMULATION_SLICE = 60; // sekunder per bit
+
+// En bit kan inte vara kortare än fönstret som ska mätas i den. För fönster som
+// är minst lika långa som biten blir NP över en enda fönsterbredd definitionsmässigt
+// bitens medeleffekt, vilket är precis vad baslinjegrenen (-1) räknar.
+function sliceTSS(slice, windowSeconds, ftp, powerExponent) {
+    if (!slice || slice.length < 2) return 0;
+
+    const useRolling = windowSeconds > 0 && windowSeconds < ACCUMULATION_SLICE;
+    const window = useRolling ? windowSeconds : -1;
+    const result = computeNP_by_time(slice, ftp, [window], powerExponent);
+    const data = result.windows[window];
+
+    return data && data.TSS ? data.TSS : 0;
+}
+
 function calculateTSSAccumulation(powerData, ftp, powerExponent) {
     if (!powerData || powerData.length < 2) return null;
 
-    const duration = powerData[powerData.length - 1].t - powerData[0].t;
-    const sampleInterval = 30; // Calculate TSS every 30 seconds
+    const firstTs = powerData[0].t;
+    const duration = powerData[powerData.length - 1].t - firstTs;
+
     const timestamps = [];
+    for (let t = ACCUMULATION_SLICE; t <= duration; t += ACCUMULATION_SLICE) {
+        timestamps.push(t / 60); // Convert to minutes for chart
+    }
+
     const tssData = {};
 
-    // Initialize data arrays for each TSS window type
-    Object.keys(TSS_CONFIGS).forEach(windowType => {
-        const config = TSS_CONFIGS[windowType];
-        tssData[config.elementId] = [];
+    Object.values(TSS_CONFIGS).forEach(config => {
+        const sliceSec = Math.max(ACCUMULATION_SLICE, config.seconds);
+        const series = [];
+
+        let accumulated = 0;
+        let sliceStart = firstTs;
+        let boundary = sliceSec;
+
+        timestamps.forEach(minutes => {
+            const elapsed = minutes * 60;
+
+            // Summera de bitar som hunnit bli fullständiga
+            while (elapsed >= boundary) {
+                const slice = powerData.filter(p => p.t >= sliceStart && p.t < firstTs + boundary);
+                accumulated += sliceTSS(slice, config.seconds, ftp, powerExponent);
+                sliceStart = firstTs + boundary;
+                boundary += sliceSec;
+            }
+
+            series.push(accumulated > 0 ? Math.round(accumulated * 10) / 10 : null);
+        });
+
+        tssData[config.elementId] = series;
     });
-
-    // Calculate TSS at regular intervals
-    for (let t = sampleInterval; t <= duration; t += sampleInterval) {
-        timestamps.push(t / 60); // Convert to minutes for chart
-
-        // Get power data up to this point
-        const currentData = powerData.filter(p => p.t <= t);
-
-        if (currentData.length > 10) { // Need some data to calculate
-            // Calculate TSS for each window type up to this point
-            const tssResults = computeNP_by_time(currentData, ftp, getTSSWindowSeconds(), powerExponent);
-
-            Object.entries(TSS_CONFIGS).forEach(([windowType, config]) => {
-                const windowData = tssResults.windows[config.seconds];
-                const tssValue = windowData && windowData.TSS ? windowData.TSS : null;
-                tssData[config.elementId].push(tssValue);
-            });
-        } else {
-            // Not enough data yet
-            Object.keys(TSS_CONFIGS).forEach(windowType => {
-                const config = TSS_CONFIGS[windowType];
-                tssData[config.elementId].push(null);
-            });
-        }
-    }
 
     return {
         timestamps,
@@ -1081,57 +1350,59 @@ function plotWorkoutPlan(workout) {
 
 function generateWorkoutTimeline(workout) {
     const timeline = [];
+    const ftp = currentFTP();
     let currentTime = 0;
 
     workout.segments.forEach(segment => {
-        currentTime = processSegment(segment, timeline, currentTime);
+        currentTime = processSegment(segment, timeline, currentTime, ftp);
     });
 
     return timeline;
 }
 
-function processSegment(segment, timeline, currentTime) {
+function processSegment(segment, timeline, currentTime, ftp) {
+    // Målen räknas om till watt först vid visning
+    const step = (target, duration) => {
+        const watt = segmentWatt(target, ftp);
+        timeline.push({ x: currentTime / 60, y: watt });
+        currentTime += duration;
+        timeline.push({ x: currentTime / 60, y: watt });
+    };
+
     if (segment.type === 'interval' && segment.repeat) {
         // Handle repeated intervals
         for (let i = 0; i < segment.repeat; i++) {
             if (segment.subSegments && segment.subSegments.length > 0) {
                 // Recursive intervals with sub-segments
                 segment.subSegments.forEach(subSegment => {
-                    timeline.push({ x: currentTime / 60, y: subSegment.targetWatt });
-                    currentTime += subSegment.duration;
-                    timeline.push({ x: currentTime / 60, y: subSegment.targetWatt });
+                    step(subSegment, subSegment.duration);
                 });
             } else {
                 // Simple interval
-                timeline.push({ x: currentTime / 60, y: segment.targetWatt });
-                currentTime += segment.duration;
-                timeline.push({ x: currentTime / 60, y: segment.targetWatt });
+                step(segment, segment.duration);
             }
 
             // Rest period (except after last interval)
             if (i < segment.repeat - 1 && segment.rest) {
-                timeline.push({ x: currentTime / 60, y: segment.rest.targetWatt });
-                currentTime += segment.rest.duration;
-                timeline.push({ x: currentTime / 60, y: segment.rest.targetWatt });
+                step(segment.rest, segment.rest.duration);
             }
         }
     } else {
         // Simple segment (warmup, cooldown, etc.)
-        timeline.push({ x: currentTime / 60, y: segment.targetWatt });
-        currentTime += segment.duration;
-        timeline.push({ x: currentTime / 60, y: segment.targetWatt });
+        step(segment, segment.duration);
     }
 
     return currentTime;
 }
 
 function calculateWorkoutTSS(workout) {
+    const ftp = currentFTP();
+
     // Convert workout to power data format (1-second intervals)
-    const powerData = generateWorkoutPowerData(workout);
+    const powerData = generateWorkoutPowerData(workout, ftp);
 
     if (powerData.length === 0) return;
 
-    const ftp = parseInt(document.getElementById('ftpInput').value) || CONFIG.DEFAULT_FTP;
     const powerExponent = parseFloat(document.getElementById('powerRaiseInput').value) || CONFIG.DEFAULT_POWER_EXPONENT;
 
     console.log('Calculating workout TSS with', powerData.length, 'data points');
@@ -1146,6 +1417,7 @@ function calculateWorkoutTSS(workout) {
             minutes: Math.round(tssData.duration / 60),
             hours: Math.round(tssData.duration / 3600 * 10) / 10
         },
+        cleaning: tssData.cleaning,
         windows: {}
     };
 
@@ -1158,63 +1430,48 @@ function calculateWorkoutTSS(workout) {
     displayWorkoutTSS(workout, tssResults);
 }
 
-function generateWorkoutPowerData(workout) {
+function generateWorkoutPowerData(workout, ftp) {
     const powerData = [];
     let currentTime = 0;
 
     workout.segments.forEach(segment => {
-        currentTime = processSegmentPowerData(segment, powerData, currentTime);
+        currentTime = processSegmentPowerData(segment, powerData, currentTime, ftp);
     });
 
     return powerData;
 }
 
-function processSegmentPowerData(segment, powerData, currentTime) {
+function processSegmentPowerData(segment, powerData, currentTime, ftp) {
+    // Ett steg i passet, i watt vid den FTP som gäller nu
+    const fill = (target, duration) => {
+        const watt = segmentWatt(target, ftp);
+        for (let t = 0; t < duration; t++) {
+            powerData.push({ t: currentTime + t, p: watt });
+        }
+        currentTime += duration;
+    };
+
     if (segment.type === 'interval' && segment.repeat) {
         // Handle repeated intervals
         for (let i = 0; i < segment.repeat; i++) {
             if (segment.subSegments && segment.subSegments.length > 0) {
                 // Recursive intervals with sub-segments
                 segment.subSegments.forEach(subSegment => {
-                    for (let t = 0; t < subSegment.duration; t++) {
-                        powerData.push({
-                            t: currentTime + t,
-                            p: subSegment.targetWatt
-                        });
-                    }
-                    currentTime += subSegment.duration;
+                    fill(subSegment, subSegment.duration);
                 });
             } else {
                 // Simple interval - add 1-second data points
-                for (let t = 0; t < segment.duration; t++) {
-                    powerData.push({
-                        t: currentTime + t,
-                        p: segment.targetWatt
-                    });
-                }
-                currentTime += segment.duration;
+                fill(segment, segment.duration);
             }
 
             // Rest period (except after last interval)
             if (i < segment.repeat - 1 && segment.rest) {
-                for (let t = 0; t < segment.rest.duration; t++) {
-                    powerData.push({
-                        t: currentTime + t,
-                        p: segment.rest.targetWatt
-                    });
-                }
-                currentTime += segment.rest.duration;
+                fill(segment.rest, segment.rest.duration);
             }
         }
     } else {
         // Simple segment - add 1-second data points
-        for (let t = 0; t < segment.duration; t++) {
-            powerData.push({
-                t: currentTime + t,
-                p: segment.targetWatt
-            });
-        }
-        currentTime += segment.duration;
+        fill(segment, segment.duration);
     }
 
     return currentTime;
@@ -1314,21 +1571,13 @@ function updateTSSConfig(key, property, value) {
     if (TSS_CONFIGS[key]) {
         TSS_CONFIGS[key][property] = value;
 
-        // Update display key based on seconds
+        // displayKey är identifieraren resultaten slås upp med och måste därför
+        // härledas ur fönsterlängden (FA-7). Den gamla formen avrundade till hela
+        // minuter, så 90 s och 120 s blev båda '2Minute' och skrev över varandra.
+        // Med w${seconds} betyder lika nyckel lika fönsterlängd, alltså samma
+        // korrekta värde - kollisionen är omöjlig att göra fel.
         if (property === 'seconds') {
-            const minutes = Math.round(value / 60);
-            const hours = Math.round(value / 3600);
-            let displayKey;
-
-            if (value < 60) {
-                displayKey = `${value}Second`;
-            } else if (value < 3600) {
-                displayKey = `${minutes}Minute`;
-            } else {
-                displayKey = `${hours}Hour`;
-            }
-
-            TSS_CONFIGS[key].displayKey = displayKey;
+            TSS_CONFIGS[key].displayKey = `w${value}`;
         }
 
         console.log('TSS Config updated:', key, property, value);
@@ -1367,9 +1616,9 @@ function addNewTSSConfig() {
 
     TSS_CONFIGS[newKey] = {
         seconds: newSeconds,
-        displayKey: '1Minute',
+        displayKey: `w${newSeconds}`,
         elementId: `tss${newKey}`,
-        label: '1m TSS (Custom)',
+        label: `TSS@${newSeconds}s`,
         chartColor: '#9C27B0',
         chartBackground: '#f3e5f5'
     };
@@ -1383,41 +1632,7 @@ function addNewTSSConfig() {
 }
 
 function resetTSSConfigs() {
-    TSS_CONFIGS = {
-        SPRINT: {
-            seconds: 10,
-            displayKey: 'tenSecond',
-            elementId: 'tssSprint',
-            label: 'TSS (Sprint)',
-            chartColor: '#f57c00',
-            chartBackground: '#fff3e0'
-        },
-        VO2_MAX: {
-            seconds: 180,
-            displayKey: 'threeMinute',
-            elementId: 'tssVo2Max',
-            label: 'TSS (VO2max)',
-            chartColor: '#388e3c',
-            chartBackground: '#e8f5e8'
-        },
-        THRESHOLD: {
-            seconds: 600,
-            displayKey: 'tenMinute',
-            elementId: 'tssThreshold',
-            label: 'TSS (Threshold)',
-            chartColor: '#1976d2',
-            chartBackground: '#e3f2fd'
-        },
-        STANDARD: {
-            seconds: 30, // Fixed 30-second standard
-            displayKey: 'standard',
-            elementId: 'tssStandard',
-            label: 'TSS (Standard)',
-            chartColor: '#7b1fa2',
-            chartBackground: '#f3e5f5',
-            fixed: true // Cannot be edited or removed
-        }
-    };
+    TSS_CONFIGS = createDefaultTSSConfigs();
 
     renderTSSConfigList();
     rebuildTSSDisplay();
@@ -1438,9 +1653,20 @@ function rebuildTSSDisplay() {
         statBox.innerHTML = `
             <div class="stat-label">${config.label}</div>
             <div class="stat-value" id="${config.elementId}" style="color: ${config.chartColor};">--</div>
+            ${config.reference ? '<div class="stat-note">Coggans standardfönster – den siffra som går att jämföra med Strava, TrainingPeaks och WKO. Övriga fönster är verktygets egen utvidgning.</div>' : ''}
         `;
         container.appendChild(statBox);
     });
+
+    const spreadBox = document.createElement('div');
+    spreadBox.className = 'stat-box';
+    spreadBox.style.background = '#fffde7';
+    spreadBox.innerHTML = `
+        <div class="stat-label">Spridning (variabilitet)</div>
+        <div class="stat-value" id="tssSpread" style="color: #f9a825;">--</div>
+        <div class="stat-note" id="tssSpreadNote"></div>
+    `;
+    container.appendChild(spreadBox);
 }
 
 // Make functions globally available for HTML onclick handlers
@@ -1516,9 +1742,9 @@ function createSegmentEditor(segment, index) {
                                onchange="updateWorkoutSegment(${index}, 'duration', parseInt(this.value))">
                     </div>
                     <div class="form-group">
-                        <label>Target Power (watts):</label>
-                        <input type="number" min="50" max="1000" value="${segment.targetWatt || 250}"
-                               onchange="updateWorkoutSegment(${index}, 'targetWatt', parseInt(this.value))">
+                        <label>Mål (% av FTP) – ${segmentWatt(segment, currentFTP())} W vid FTP ${currentFTP()}:</label>
+                        <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(segment, currentFTP()) * 100)}"
+                               onchange="updateWorkoutSegment(${index}, 'targetPercent', parseInt(this.value) / 100)">
                     </div>
                 </div>
             `;
@@ -1539,9 +1765,9 @@ function createSegmentEditor(segment, index) {
                                                onchange="updateWorkoutSubSegment(${index}, ${subIndex}, 'duration', parseInt(this.value))">
                                     </div>
                                     <div class="form-group">
-                                        <label>Power (watts):</label>
-                                        <input type="number" min="50" max="1000" value="${subSeg.targetWatt}"
-                                               onchange="updateWorkoutSubSegment(${index}, ${subIndex}, 'targetWatt', parseInt(this.value))">
+                                        <label>Mål (% av FTP) – ${segmentWatt(subSeg, currentFTP())} W:</label>
+                                        <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(subSeg, currentFTP()) * 100)}"
+                                               onchange="updateWorkoutSubSegment(${index}, ${subIndex}, 'targetPercent', parseInt(this.value) / 100)">
                                     </div>
                                     <div class="form-group">
                                         <button class="remove-btn" onclick="removeSubSegment(${index}, ${subIndex})">Remove</button>
@@ -1567,9 +1793,9 @@ function createSegmentEditor(segment, index) {
                                    onchange="updateWorkoutSegmentRest(${index}, 'duration', parseInt(this.value))">
                         </div>
                         <div class="form-group">
-                            <label>Rest Power (watts):</label>
-                            <input type="number" min="50" max="500" value="${segment.rest.targetWatt}"
-                                   onchange="updateWorkoutSegmentRest(${index}, 'targetWatt', parseInt(this.value))">
+                            <label>Vila (% av FTP):</label>
+                            <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(segment.rest, currentFTP()) * 100)}"
+                                   onchange="updateWorkoutSegmentRest(${index}, 'targetPercent', parseInt(this.value) / 100)">
                         </div>
                     </div>
                 </div>
@@ -1585,9 +1811,9 @@ function createSegmentEditor(segment, index) {
                            onchange="updateWorkoutSegment(${index}, 'duration', parseInt(this.value))">
                 </div>
                 <div class="form-group">
-                    <label>Target Power (watts):</label>
-                    <input type="number" min="50" max="1000" value="${segment.targetWatt}"
-                           onchange="updateWorkoutSegment(${index}, 'targetWatt', parseInt(this.value))">
+                    <label>Mål (% av FTP):</label>
+                    <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(segment, currentFTP()) * 100)}"
+                           onchange="updateWorkoutSegment(${index}, 'targetPercent', parseInt(this.value) / 100)">
                 </div>
             </div>
         `;
@@ -1627,23 +1853,23 @@ function addWorkoutSegment(type) {
     const newSegment = {
         type: type,
         duration: 300, // 5 minutes default
-        targetWatt: 150
+        targetPercent: 0.75
     };
 
     if (type === 'interval') {
         newSegment.repeat = 5; // Default to 5 repetitions
         newSegment.subSegments = [
-            { duration: 60, targetWatt: 400 },  // 1min @ 400w
-            { duration: 300, targetWatt: 200 }, // 5min @ 200w
-            { duration: 120, targetWatt: 250 }  // 2min @ 250w
+            { duration: 60, targetPercent: 2.0 },  // 1min @ 200 % av FTP
+            { duration: 300, targetPercent: 1.0 }, // 5min @ FTP
+            { duration: 120, targetPercent: 1.25 } // 2min @ 125 % av FTP
         ];
         newSegment.rest = {
             duration: 180, // 3 minutes rest
-            targetWatt: 100
+            targetPercent: 0.5
         };
         // Remove simple interval properties since we're using sub-segments
         delete newSegment.duration;
-        delete newSegment.targetWatt;
+        delete newSegment.targetPercent;
     }
 
     currentWorkout.segments.push(newSegment);
@@ -1661,22 +1887,22 @@ function resetWorkoutToDefault() {
             {
                 "type": "warmup",
                 "duration": 600,
-                "targetWatt": 150
+                "targetPercent": 0.75
             },
             {
                 "type": "interval",
                 "duration": 240,
-                "targetWatt": 250,
+                "targetPercent": 0.95,
                 "repeat": 4,
                 "rest": {
                     "duration": 120,
-                    "targetWatt": 100
+                    "targetPercent": 0.5
                 }
             },
             {
                 "type": "cooldown",
                 "duration": 300,
-                "targetWatt": 120
+                "targetPercent": 0.6
             }
         ]
     };
@@ -1702,19 +1928,19 @@ function toggleIntervalType(segmentIndex, type) {
         // Convert to complex interval with sub-segments
         if (!segment.subSegments) {
             segment.subSegments = [
-                { duration: 60, targetWatt: 400 },  // 1min @ 400w
-                { duration: 300, targetWatt: 200 }, // 5min @ 200w
-                { duration: 120, targetWatt: 250 }  // 2min @ 250w
+                { duration: 60, targetPercent: 2.0 },  // 1min @ 200 % av FTP
+                { duration: 300, targetPercent: 1.0 }, // 5min @ FTP
+                { duration: 120, targetPercent: 1.25 } // 2min @ 125 % av FTP
             ];
         }
         // Remove simple interval properties
         delete segment.duration;
-        delete segment.targetWatt;
+        delete segment.targetPercent;
     } else {
         // Convert to simple interval
         delete segment.subSegments;
         segment.duration = 240; // 4 minutes default
-        segment.targetWatt = 250; // Default power
+        segment.targetPercent = 1.0; // Default: FTP
     }
 
     renderWorkoutEditor();
@@ -1740,7 +1966,7 @@ function addSubSegment(segmentIndex) {
 
         currentWorkout.segments[segmentIndex].subSegments.push({
             duration: 60,
-            targetWatt: 200
+            targetPercent: 1.0
         });
 
         renderWorkoutEditor();
@@ -1849,27 +2075,34 @@ function validateWorkoutStructure(workout) {
             if (segment.subSegments && Array.isArray(segment.subSegments)) {
                 for (const subSeg of segment.subSegments) {
                     if (typeof subSeg.duration !== 'number' || subSeg.duration < 1) return false;
-                    if (typeof subSeg.targetWatt !== 'number' || subSeg.targetWatt < 1) return false;
+                    if (!hasValidTarget(subSeg)) return false;
                 }
             } else {
                 // Simple interval validation
                 if (typeof segment.duration !== 'number' || segment.duration < 1) return false;
-                if (typeof segment.targetWatt !== 'number' || segment.targetWatt < 1) return false;
+                if (!hasValidTarget(segment)) return false;
             }
 
             // Check rest period if present
             if (segment.rest) {
                 if (typeof segment.rest.duration !== 'number' || segment.rest.duration < 1) return false;
-                if (typeof segment.rest.targetWatt !== 'number' || segment.rest.targetWatt < 1) return false;
+                if (!hasValidTarget(segment.rest)) return false;
             }
         } else {
             // Simple segment validation (warmup, cooldown)
             if (typeof segment.duration !== 'number' || segment.duration < 1) return false;
-            if (typeof segment.targetWatt !== 'number' || segment.targetWatt < 1) return false;
+            if (!hasValidTarget(segment)) return false;
         }
     }
 
     return true;
+}
+
+// targetPercent: 0 är giltigt - det är så äkta vila uttrycks (FA-6). Äldre filer
+// med absoluta watt accepteras fortfarande, med det gamla kravet targetWatt >= 1.
+function hasValidTarget(target) {
+    if (typeof target.targetPercent === 'number') return target.targetPercent >= 0;
+    return typeof target.targetWatt === 'number' && target.targetWatt >= 1;
 }
 
 function generateWorkoutId() {

@@ -30,7 +30,8 @@ UI text is in Swedish.
 ├── index.html              # Landing page linking the tools
 ├── CLAUDE.md
 ├── .github/workflows/
-│   └── pages.yml           # Deploy to GitHub Pages on push to master
+│   ├── pages.yml           # Deploy to GitHub Pages on push to master
+│   └── check.yml           # Syntax, lint and tests on every push
 ├── docs/                   # Documentation of the training models (Swedish)
 ├── power-curve/
 │   └── index.html          # Self-contained: markup, styles and logic in one file
@@ -45,10 +46,12 @@ UI text is in Swedish.
 │   └── styles.css
 └── wbal/
     ├── index.html
-    ├── script.js
+    ├── model.js            # Templates, W'bal simulation and solver - no DOM
+    ├── script.js           # DOM and rendering; calls model.js
+    ├── test/model.test.js  # node --test: invariants and the documented baseline
     ├── styles.css
-    ├── package.json        # Lint tooling only - not a build or a runtime dependency
-    ├── eslint.config.js    # Flat config, with sonarjs rules
+    ├── package.json        # Lint and test tooling only - not a build or a runtime dependency
+    ├── eslint.config.mjs   # Flat config, with sonarjs rules
     ├── .eslintrc.js        # Legacy config, still present
     └── .jshintrc
 ```
@@ -60,8 +63,11 @@ UI text is in Swedish.
 python3 -m http.server 8000
 
 # Lint wbal/
-cd wbal && npx eslint script.js
-cd wbal && npx jshint script.js
+cd wbal && npx eslint script.js model.js
+cd wbal && npx jshint script.js model.js
+
+# Test wbal/ (node --test, no dependencies beyond Node itself)
+cd wbal && npm test
 ```
 
 `fit-analysis/` fetches `sample-workout.json` at startup, so it must be served over HTTP -
@@ -83,8 +89,13 @@ the FIT parser is vendored in `fit-analysis/dist/`.
 
 `.github/workflows/pages.yml` deploys to GitHub Pages on every push to `master`, and can be
 run manually via `workflow_dispatch`. It copies the repository to `_site` with rsync,
-excluding `.git`, `.github`, `node_modules` and `CLAUDE.md`. There is no build or test step
-in CI.
+excluding `.git`, `.github`, `node_modules` and `CLAUDE.md`. There is no build step.
+
+`.github/workflows/check.yml` runs on every push and pull request: `node --check` on every
+`.js` file outside `wbal/node_modules/`, eslint and jshint on `wbal/script.js` and
+`wbal/model.js`, and `npm test` in `wbal/`. It installs nothing - `wbal/node_modules/` is
+committed and `node --test` ships with Node. Only `wbal/` has tests; the other three tools
+are single HTML files and are verified in the browser.
 
 ## Documentation
 

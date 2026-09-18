@@ -3,7 +3,10 @@
 Alla fel i Critical Power-verktyget. Berör en enda fil: **`power-curve/index.html`**,
 och fyra av sex fel sitter inom sju rader (120–126).
 
-**Inget är åtgärdat.** Siffrorna är uppmätta genom att köra koden, inte uppskattade.
+**Åtgärdat i PR 4, 5 och 10** enligt [13](13-genomforandeplan.md). Listan beskriver vad som var
+fel och varför, inte vad som återstår - PC-1 till PC-6 är rättade, och PC-5 dessutom
+strukturellt genom minstakvadratanpassningen i [11 §10](11-effekt-duration-protokoll.md).
+Siffrorna är uppmätta genom att köra den ursprungliga koden, inte uppskattade.
 
 ## Feltyper som används i detta dokument
 

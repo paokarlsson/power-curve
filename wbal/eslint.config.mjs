@@ -10,7 +10,8 @@ export default [
                 document: "readonly",
                 window: "readonly",
                 console: "readonly",
-                Math: "readonly"
+                Math: "readonly",
+                module: "writable"
             }
         },
         plugins: {

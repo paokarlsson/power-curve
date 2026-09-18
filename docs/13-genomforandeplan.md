@@ -12,6 +12,14 @@ steg som redan står i [07](07-fel-power-curve.md)–[12](12-omskrivning-wbal.md
 dokumentationen lämnar öppna är avgjorda i §5. Alternativen står kvar där, men som motiv till
 ett fattat beslut — inte som något som ska vägas igen.
 
+**Status: genomförd.** Samtliga tio PR är körda, commit för commit enligt §4, plus de två
+fortsättningar §4 sköt upp (resampling till 1 Hz och kadenskanalen i `fit-analysis/`) och en
+bugg som inte stod i någon fellista ([RUN-5](08-fel-running.md)). Fyra ställen där
+mätningen inte höll med dokumentationen är rättade i källdokumenten och markerade
+**[Justerat]** där de hör hemma: förskjutningen i [12 §4](12-omskrivning-wbal.md),
+påståendet om implementationsfel i [08](08-fel-running.md), och TSS-per-timme i
+[10 §FA-3](10-fel-fit-analysis.md).
+
 ---
 
 ## 1. De tre frågorna, besvarade först
@@ -21,7 +29,7 @@ ett fattat beslut — inte som något som ska vägas igen.
 **Ja — nio.** Två skäl, och bara det första är tvingande.
 
 **Tvingande — [12](12-omskrivning-wbal.md) kräver det.** Steg 1–3 sänker föreskriven effekt
-med 1–12 W; steg 4 (CP/FTP) höjer varje siffra med exakt 10,5 W. Släpps de ihop tar de ut
+med 1–12 W; steg 4 (CP/FTP) höjer varje siffra med ~10,5 W. Släpps de ihop tar de ut
 varandra och **ingendera går att verifiera**. [12 §Ordning](12-omskrivning-wbal.md) säger
 det rakt ut: *"Släpp steg 4 separat."* Det är en releasegräns, inte en granskningspreferens.
 
@@ -194,7 +202,7 @@ Egen release. Nettoeffekten blir annars ungefär noll för de korta passen
 | # | Commit | Åtgärdar | Grönt av |
 |---|---|---|---|
 | 3.1 | Döp om fältet `index.html:17` till `CP (Critical Power)`. Explicit FTP-inmatning konverteras med `CP ≈ FTP / 0,95` och märks som uppskattad. | [WB-5](09-fel-wbal.md) | Test: FTP 200 W inmatat ger exakt samma siffror som CP 210,5 W |
-| 3.2 | Uppdatera snapshot: varje mall +10,5 W vid FTP-inmatning. | [WB-5](09-fel-wbal.md) | Förskjutningen är **identisk för alla mallar** — ett enda tal, inte 19 |
+| 3.2 | Uppdatera snapshot: varje mall ~+10,5 W vid FTP-inmatning. | [WB-5](09-fel-wbal.md) | Förskjutningen är **nästan** ett enda tal: +10,56 till +10,96 W, avrundat +10 eller +11 W. Se [12 §4 [Justerat]](12-omskrivning-wbal.md) — härledd τ gör den CP-beroende |
 
 ### PR 4 — `power-curve/`: de fem billiga
 

@@ -5,7 +5,7 @@
 det ska rättas och hur man vet att det blev rätt.
 
 **Alla siffror nedan är mätta.** Solvern är återimplementerad med den nya matematiken och
-körd mot samtliga 20 mallar och mot parametersvep. Tre saker i planen överlever inte den
+körd mot samtliga 20 mallar och mot parametersvep. Fyra saker i planen överlever inte den
 mätningen; de står som **[Justerat]** vid respektive steg och är sammanfattade i §9.
 
 ## Bakgrund
@@ -248,17 +248,37 @@ W′-förbrukningen överskattas i varje intervall.
 - Matas FTP in manuellt: konvertera explicit (`CP ≈ FTP / 0,95`) och märk värdet som
   uppskattat i gränssnittet.
 
-### Storleken på felet
+### Storleken på felet  **[Justerat]**
 
 FTP 200 W inmatat som CP, mot korrekt CP = 200 / 0,95 = 210,5 W, W′ 15 kJ, mål 30 %:
+`ΔCP = 10,53 W`.
 
-**Exakt +10,5 W på varje mall.** Inte ungefär — identiskt, för alla 20.
+Planen säger **exakt +10,5 W på varje mall — identiskt, för alla 20**, med motiveringen att
+föreskriven effekt löses ur `(P − CP) · tid` mot ett fast W′-mål, så ett skift i CP flyttar
+P lika mycket.
 
-Det följer av modellens form: föreskriven effekt löses ur `(P − CP) · tid` mot ett fast
-W′-mål, så ett skift i CP flyttar P lika mycket. Felet är alltså en **ren förskjutning**,
-inte en förvrängning: det ändrar ingenting i mönstret mellan mallar, bara nivån. Det
-förklarar varför det är svårt att upptäcka på utfallet — allt ser fortfarande konsekvent
-ut, bara 5 % för lätt.
+**Det höll före steg 1, men inte efter.** Mätt på implementationen med härledd τ blir
+förskjutningen +10,56 till +10,96 W — nästan ett rent skift, men inte ett enda tal:
+
+| | Förskjutning |
+|---|---|
+| `ΔCP` (det rena skiftet) | 10,53 W |
+| Minst, `2×15 min` | **10,56 W** |
+| Mest, `10×1 min` | **10,96 W** |
+| Avrundat, 13 av 19 mallar | +11 W |
+| Avrundat, 6 av 19 mallar | +10 W |
+
+Skälet är att steg 1 gjorde återhämtningen CP-beroende. Viloeffekten är `CP · restPercent`,
+alltså är `D_CP = CP · (1 − restPercent)`, och τ = 546·e^(−0,01·D_CP) + 316 **sjunker** när
+CP stiger — vid `restPercent` 0,5 från 517 s till 507 s. Kortare τ ger snabbare
+återhämtning, vilket tillåter något mer effekt än det rena skiftet. Den gamla
+återhämtningsfaktorn `(CP − viloeffekt)/CP` var däremot lika med `1 − restPercent` och
+alltså oberoende av CP — därför var förskjutningen exakt ett tal så länge τ var en
+användarinställning.
+
+Felet är alltså i praktiken en **förskjutning, inte en förvrängning**: spridningen mellan
+mallar är 0,4 W, mot en nivåändring på 10,5 W. Det förklarar varför det är svårt att
+upptäcka på utfallet — allt ser fortfarande konsekvent ut, bara 5 % för lätt.
 
 ---
 
@@ -389,13 +409,14 @@ Tre rader att läsa noga:
 
 ---
 
-## De tre justeringarna
+## De fyra justeringarna
 
 | # | Planen säger | Mätningen säger | Åtgärd |
 |---|---|---|---|
 | 1 | Effekterna stiger, mest för korta anaeroba pass | 17 av 20 sjunker; de anaeroba sjunker mest (−7 till −12 W) | Vänd förväntan i steg 5, och ta bort feldiagnosen "då är steg 1 eller 3 inte genomfört" |
 | 2 | Passiv vila > 99 % av W′ efter 30 min | Håller bara för CP > 198,7 W; default 200 W klarar med 1,3 W marginal | Använd > 98 % efter 30 min, eller > 99 % efter 35 min |
 | 3 | Tillståndet `infeasible` | Onåbart: vid 0,5 × CP förbrukas ingenting, `min(W′bal) = W′` | Ersätt med `floor_limited` — doseringsmålet nås inte utan att bottennivån bryts |
+| 4 | Steg 4 flyttar varje mall exakt +10,5 W | +10,56 till +10,96 W efter steg 1: härledd τ gör återhämtningen CP-beroende | Läs förskjutningen som ett spann, inte ett tal; avrundat +10 eller +11 W |
 
 Ingen av dem rör riktningen i planen. Steg 1–4 är rätt åtgärder på rätt fel; det är två
 acceptanskriterier och en förväntan på utfallet som inte stämmer, och alla tre skulle ha

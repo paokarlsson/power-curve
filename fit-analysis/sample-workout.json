@@ -6,22 +6,22 @@
     {
       "type": "warmup",
       "duration": 600,
-      "targetWatt": 150
+      "targetPercent": 0.75
     },
     {
       "type": "interval",
       "duration": 240,
-      "targetWatt": 250,
+      "targetPercent": 0.95,
       "repeat": 4,
       "rest": {
         "duration": 120,
-        "targetWatt": 100
+        "targetPercent": 0.5
       }
     },
     {
       "type": "cooldown",
       "duration": 300,
-      "targetWatt": 120
+      "targetPercent": 0.6
     }
   ]
 }
