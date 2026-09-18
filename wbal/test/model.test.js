@@ -5,11 +5,10 @@
 //
 //   * INVARIANTER ska hålla i varje commit, oavsett vilken matematik modellen
 //     använder. De får aldrig uppdateras för att "passa" en ändring.
-//   * SNAPSHOT låser mätta tal ur docs/12-omskrivning-wbal.md. Mellan 2.2 och
-//     2.4 finns ingen tabell att låsa mallarnas watt mot - de talen står
-//     ingenstans i dokumentationen - så den delen håller bara de τ-värden och
-//     acceptanskriterier steget självt är mätt mot. Kolumnen "Efter" låses igen
-//     i 2.5, och aldrig mot vad körningen råkar ge.
+//   * SNAPSHOT låser mätta tal ur docs/12-omskrivning-wbal.md: de härledda
+//     τ-värdena och kolumnen "Efter" i §Mätt utfall. Ändras något av dem ska
+//     det nya värdet komma ur en mätning som skrivs in i docs/12 - aldrig ur
+//     vad körningen råkar ge.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -175,6 +174,35 @@ test('varje föreskriven effekt lämnar bottennivån över noll', () => {
     }
 });
 
+test('bottennivån håller över hela parametersvepet', () => {
+    // Test 7 i docs/12 §Regressionstest: CP 150-350 W, W' 6-30 kJ, mål 10-30 %.
+    // Mäts på den presenterade heltalseffekten, inte på den oavrundade lösningen.
+    let cases = 0;
+
+    for (let cp = 150; cp <= 350; cp += 25) {
+        for (let wPrime = 6000; wPrime <= 30000; wPrime += 3000) {
+            for (let targetPercent = 10; targetPercent <= 30; targetPercent += 5) {
+                const target = wPrime * targetPercent / 100;
+
+                for (const template of model.workoutTemplates) {
+                    const workout = model.calculateWorkout(template, cp, wPrime, target);
+                    cases++;
+
+                    if (workout.status === 'out_of_range') {
+                        continue;
+                    }
+
+                    const outcome = model.simulateWorkout(template, workout.power, cp, wPrime, cp * template.restPercent);
+                    assert.ok(outcome.minWbal > 0,
+                        `${template.name}, CP ${cp} W, W' ${wPrime} J, mål ${targetPercent} %: min ${outcome.minWbal.toFixed(0)} J vid ${workout.power} W`);
+                }
+            }
+        }
+    }
+
+    assert.ok(cases > 7000, `svepet täckte bara ${cases} fall`);
+});
+
 test('2x15 min är en genomförbar lösning, inte ett klippt gränsvärde', () => {
     // Test 4 i docs/12 §Regressionstest: idag −155 J, klippt mot undre gränsen
     // 1,05 × CP. Watttalet låses i snapshotten nedan.
@@ -208,7 +236,7 @@ test('out_of_range visas aldrig som en vanlig rekommendation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Snapshot: mätta τ-värden ur docs/12-omskrivning-wbal.md §1
+// Snapshot: mätta tal ur docs/12-omskrivning-wbal.md
 // ---------------------------------------------------------------------------
 
 test('τ härleds till de tabellerade värdena vid CP 200 W', () => {
@@ -224,5 +252,44 @@ test('τ för passiv vila följer CP enligt den mätta tabellen', () => {
     const expected = [[150, 437.8], [200, 389.9], [250, 360.8], [350, 332.5]];
     for (const [cp, tau] of expected) {
         assert.equal(model.deriveTau(cp, 0).toFixed(1), tau.toFixed(1), `CP ${cp} W`);
+    }
+});
+
+// Kolumnen "Efter" i docs/12 §Mätt utfall: CP 200 W, W' 15 kJ, mål-W'bal 30 %
+// (= 4500 J). Kolumnerna är [mall, effekt, procent av CP, min(W'bal)]. min mäts
+// på den oavrundade lösningen, precis som tabellen.
+const EFTER = [
+    ['4×4 min', 217, 109, 4500],
+    ['5×5 min', 212, 106, 4500],
+    ['6×3 min', 216, 108, 4500],
+    ['8×2 min', 219, 109, 4500],
+    ['3×8 min', 211, 105, 4500],
+    ['4×6 min', 211, 106, 4500],
+    ['2×10 min', 211, 106, 4500],
+    ['10×90s', 219, 109, 4500],
+    ['12×1 min', 226, 113, 4500],
+    ['15×1 min', 221, 110, 4500],
+    ['20×30s', 230, 115, 4500],
+    ['12×45s', 231, 115, 4500],
+    ['10×1 min', 235, 118, 4500],
+    ['3×(10×40s)', 219, 109, 4500],
+    ['Pyramid 1-2-3-4-3-2-1', 215, 108, 4234],
+    ['Pyramid 2-4-6-4-2', 215, 107, 4015],
+    ['5×(2min + 1min)', 218, 109, 4500],
+    ['4×(3min + 2min)', 213, 107, 4500],
+    ['2×15 min', 208, 104, 4500]
+];
+
+test('alla 19 mallar ger kolumnen "Efter" på defaultvärden', () => {
+    const workouts = model.calculateAllWorkouts(CP, W_PRIME, TARGET_WBAL);
+    assert.equal(workouts.length, EFTER.length);
+
+    for (let i = 0; i < EFTER.length; i++) {
+        const [name, power, percentage, minWbal] = EFTER[i];
+        assert.equal(workouts[i].name, name, `mall ${i} heter ${workouts[i].name}`);
+        assert.equal(workouts[i].status, 'solved', `${name}: tillstånd`);
+        assert.equal(workouts[i].power, power, `${name}: effekt`);
+        assert.equal(workouts[i].percentage, percentage, `${name}: procent av CP`);
+        assert.equal(Math.round(workouts[i].minWbal), minWbal, `${name}: min(W'bal)`);
     }
 });
