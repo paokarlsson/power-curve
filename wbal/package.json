@@ -9,7 +9,6 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "module",
   "devDependencies": {
     "complexity-report": "^2.0.0-alpha",
     "eslint": "^9.38.0",
