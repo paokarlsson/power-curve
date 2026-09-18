@@ -1,6 +1,33 @@
-/* global calculateAllWorkouts, cpFromFtp */
+/* global AthleteProfile, calculateAllWorkouts, cpFromFtp */
 // Gränssnittet för Intervall Optimizer: läser inmatningen, anropar model.js och ritar
 // resultatet. All matematik ligger i model.js.
+
+// Verktyget är signaturens konsument, inte dess källa: CP och W' mäts i
+// power-curve/ och hämtas härifrån om de finns. Inmatningen går fortfarande att
+// ändra för hand, och då skrivs profilen om - senaste värdet gäller.
+function loadProfileIntoInputs() {
+    const profile = AthleteProfile.load();
+    const note = document.getElementById('profileNote');
+
+    if (profile.cp === undefined && profile.wPrime === undefined) {
+        note.innerHTML = `Ingen atletprofil hittad - fälten visar standardvärden.
+            Mät CP och W&#39; i <a href="../power-curve/">Power Curve Plotter</a>,
+            så fylls de i här automatiskt.`;
+        return;
+    }
+
+    // Profilen lagrar CP, aldrig FTP, så källväljaren ska stå på CP.
+    if (profile.cp !== undefined) {
+        document.getElementById('cp').value = Math.round(profile.cp);
+        document.getElementById('cpSource').value = 'cp';
+    }
+    if (profile.wPrime !== undefined) {
+        document.getElementById('wprime').value = (profile.wPrime / 1000).toFixed(1);
+    }
+
+    note.innerHTML = `Värdena kommer från den gemensamma atletprofilen
+        (<a href="../power-curve/">Power Curve Plotter</a>). Ändrar du dem här uppdateras profilen.`;
+}
 
 function calculate() {
     const enteredPower = parseFloat(document.getElementById('cp').value);
@@ -14,6 +41,14 @@ function calculate() {
     const targetWbal = W_prime * targetWbalPercent;
 
     const workouts = calculateAllWorkouts(CP, W_prime, targetWbal);
+
+    // Det är CP som sparas, aldrig det inmatade FTP-värdet: profilen har en enda
+    // storhet per fält, och konverteringen ska inte behöva göras om i nästa verktyg.
+    // Ett tomt fält ger NaN, och profilen tar bara positiva tal - utan den här
+    // kontrollen skulle ett tomt fält radera ett mätt CP ur profilen.
+    if (CP > 0 && W_prime > 0) {
+        AthleteProfile.save({ cp: CP, wPrime: W_prime });
+    }
 
     displayResults(workouts, CP, W_prime, targetWbalPercent, enteredAsFtp ? enteredPower : null);
 }
@@ -166,5 +201,6 @@ function displayResults(workouts, CP, W_prime, targetWbalPercent, ftp) {
 
 // Auto-calculate on page load
 window.onload = function() {
+    loadProfileIntoInputs();
     calculate();
 };

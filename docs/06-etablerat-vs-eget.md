@@ -36,6 +36,8 @@ när siffrorna jämförs med andra verktyg.
 | Rekursivt passchema med `subSegments` | **Egen – rimlig** | Uttrycker samma passfamilj som `wbal/` hårdkodar. | [05](05-passmodellen.md) §1 |
 | **Plan → syntetisk 1 Hz-serie → samma TSS-motor** | **Egen – rimlig, tredje bästa idén** | Gör planerad och genomförd dos direkt jämförbara, per fönster. | [05](05-passmodellen.md) §2 |
 | Absoluta watt i passchemat | **Egen – problematisk** | Mål skalar inte med FTP, men poängsättningen gör det. Exempelpasset "Threshold" ligger på 125 % av FTP. | [05](05-passmodellen.md) §4 |
+| Gemensam atletprofil för alla fyra verktyg | **Egen – rimlig** | En signatur mätt en gång, läst av alla. Tar bort den manuella överföringen som gjorde det lätt att mata in FTP där modellen ville ha CP. | [07](07-fel-power-curve.md), sista avsnittet |
+| `fit-analysis/` matar in CP, härleder FTP för TSS | **Egen – rimlig** | Samma storhet som resten av repot delar, men Coggans nämnare behålls så TSS förblir jämförbar utåt. | [03](03-normalized-power-och-tss.md) §1 |
 
 ## De tre idéerna värda att behålla och bygga vidare på
 

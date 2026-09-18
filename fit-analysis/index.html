@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FIT File Analysis - HR, Power & TSS</title>
+    <script src="../athlete-profile.js"></script>
     <script src="module-loader.js"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -20,9 +21,10 @@
             </div>
 
             <div class="form-group">
-                <label for="ftpInput">FTP (Functional Threshold Power):</label>
-                <input type="number" id="ftpInput" min="50" max="500" class="form-control">
+                <label for="cpInput">CP (Critical Power):</label>
+                <input type="number" id="cpInput" min="50" max="500" class="form-control">
                 <span class="unit-label">watts</span>
+                <p class="input-hint" id="cpHint"></p>
             </div>
 
             <div class="form-group">

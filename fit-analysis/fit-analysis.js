@@ -5,7 +5,7 @@
 // Configuration constants - centralized values
 const CONFIG = {
     // Default values
-    DEFAULT_FTP: 200,           // Default FTP value in watts
+    DEFAULT_CP: 210,            // Default CP value in watts (ger FTP 200 W, verktygets gamla default)
     DEFAULT_MAX_PEAK_POWER: 500, // Default max peak power in watts
     DEFAULT_POWER_EXPONENT: 4, // Power exponent for NP calculations
 
@@ -105,8 +105,67 @@ function segmentWatt(target, ftp) {
     return Math.round(segmentPercent(target, ftp) * ftp);
 }
 
+// Verktyget frågar efter CP, inte FTP. CP är den storhet som mäts i power-curve/
+// och som resten av repot delar via atletprofilen; FTP är ett mätrecept ovanpå
+// samma fysiologi (typiskt 95 % av ett 20-minuterstest) och ligger något under.
+// Samma tumregel och samma konstant som wbal/model.js, se docs/12 steg 4.
+const FTP_OF_CP = 0.95;
+
+function currentCP() {
+    return parseInt(document.getElementById('cpInput').value) || CONFIG.DEFAULT_CP;
+}
+
+// TSS räknas mot FTP, aldrig mot CP. Coggans definition är IF = NP/FTP och
+// TSS = (t/3600)·IF²·100, alltså 100 poäng per timme på FTP - det är den
+// definition Strava, TrainingPeaks och WKO använder, och som gör TSS@30s
+// jämförbar utåt (FA-5). Byttes nämnaren mot CP skulle varje TSS-tal i
+// verktyget sjunka med ~10 % och sluta betyda samma sak som överallt annars.
+// Inmatningen är alltså CP; nämnaren härleds ur den.
 function currentFTP() {
-    return parseInt(document.getElementById('ftpInput').value) || CONFIG.DEFAULT_FTP;
+    return Math.round(currentCP() * FTP_OF_CP);
+}
+
+// Profilen ligger i webbläsarens localStorage, per dator och per webbläsare.
+// Går den inte att läsa eller skriva fungerar verktyget precis som förut, fast
+// med sitt eget defaultvärde - det ska synas i hjälptexten.
+function loadCPFromProfile() {
+    const profile = AthleteProfile.load();
+
+    if (profile.cp !== undefined) {
+        document.getElementById('cpInput').value = Math.round(profile.cp);
+    }
+
+    showCPHint(profile.cp !== undefined);
+}
+
+function onCPChanged() {
+    // Skriv tillbaka till profilen så att en ändring här följer med till wbal/.
+    // Fältet innehåller CP, så inget behöver konverteras.
+    const saved = AthleteProfile.save({ cp: currentCP() });
+    showCPHint(saved !== null);
+
+    recalculateWithNewSettings();
+
+    // Passchemat beror på CP i båda ändar: målen anges i procent av FTP, som
+    // härleds ur CP, och referenslinjen ritas på CP. Det ritas därför om i sin
+    // helhet - recalculateWithNewSettings avbryter helt om ingen effektfil är
+    // inläst, och uppdaterar annars bara referenslinjerna, inte målwatten.
+    if (currentWorkout) {
+        plotWorkoutPlan(currentWorkout);
+    }
+}
+
+function showCPHint(fromProfile) {
+    const hint = document.getElementById('cpHint');
+    const source = fromProfile
+        ? `Värdet kommer från den gemensamma atletprofilen och delas med
+           <a href="../wbal/">Intervall Optimizer</a>.`
+        : `Ingen atletprofil hittad - fältet visar standardvärdet.
+           Mät CP i <a href="../power-curve/">Power Curve Plotter</a>, så fylls det i här automatiskt.`;
+
+    hint.innerHTML = `${source} TSS räknas mot FTP = ${Math.round(FTP_OF_CP * 100)} % av CP
+        = ${currentFTP()} W, så siffrorna är jämförbara med Strava och TrainingPeaks.
+        Passmålen nedan anges i procent av samma FTP.`;
 }
 
 // Function to get current TSS window seconds array
@@ -129,15 +188,20 @@ let currentWorkout = null; // Store workout data for TSS recalculation
 // =============================================================================
 
 // Set default values from configuration
-document.getElementById('ftpInput').value = CONFIG.DEFAULT_FTP;
+document.getElementById('cpInput').value = CONFIG.DEFAULT_CP;
 document.getElementById('maxPeakPowerInput').value = CONFIG.DEFAULT_MAX_PEAK_POWER;
 document.getElementById('powerRaiseInput').value = CONFIG.DEFAULT_POWER_EXPONENT;
+
+// Atletprofilen går före defaultvärdet: CP mäts i power-curve/ och delas med
+// wbal/. Exponent och fönsterlängder är analysinställningar, inte egenskaper hos
+// atleten, och hör därför inte hemma i profilen.
+loadCPFromProfile();
 
 // Load and display workout plan
 loadAndDisplayWorkout();
 
 // Add event listeners for real-time recalculation
-document.getElementById('ftpInput').addEventListener('input', recalculateWithNewSettings);
+document.getElementById('cpInput').addEventListener('input', onCPChanged);
 document.getElementById('maxPeakPowerInput').addEventListener('input', recalculateWithNewSettings);
 document.getElementById('powerRaiseInput').addEventListener('input', recalculateWithNewSettings);
 
@@ -205,7 +269,7 @@ document.getElementById('fitFile').addEventListener('change', function (e) {
                 // Store power records for recalculation
                 currentPowerRecords = powerRecords;
 
-                const ftp = parseInt(document.getElementById('ftpInput').value) || CONFIG.DEFAULT_FTP;
+                const ftp = currentFTP();
                 // No HR data from CSV, pass empty array
                 plotData([], powerRecords, ftp);
 
@@ -238,7 +302,7 @@ document.getElementById('fitFile').addEventListener('change', function (e) {
                     // Store power records for recalculation
                     currentPowerRecords = powerRecords;
 
-                    const ftp = parseInt(document.getElementById('ftpInput').value) || CONFIG.DEFAULT_FTP;
+                    const ftp = currentFTP();
                     plotData(hrRecords, powerRecords, ftp);
                 });
             }
@@ -258,7 +322,7 @@ function recalculateWithNewSettings() {
     console.log('recalculateWithNewSettings called, currentPowerRecords:', !!currentPowerRecords);
     if (!currentPowerRecords) return; // No data loaded yet
 
-    const ftp = parseInt(document.getElementById('ftpInput').value) || CONFIG.DEFAULT_FTP;
+    const ftp = currentFTP();
     console.log('Recalculating with FTP:', ftp);
 
     // Recalculate TSS values and redraw chart with new reference lines
@@ -430,12 +494,14 @@ function plotData(hrRecords, powerRecords, ftp) {
             yAxisID: 'y1'
         });
 
-        // Add FTP reference line
-        const ftp = parseInt(document.getElementById('ftpInput').value) || CONFIG.DEFAULT_FTP;
+        // Referenslinjen ritas på CP, inte på den härledda FTP: CP är den gräns
+        // som säger något om passet - över den töms W', under den fylls det på.
+        // FTP är bara TSS-nämnaren, och den hör hemma i hjälptexten.
+        const cp = currentCP();
         const maxTime = Math.max(...powerData.map(p => p.x));
         datasets.push({
-            label: `FTP (${ftp}W)`,
-            data: [{ x: 0, y: ftp }, { x: maxTime, y: ftp }],
+            label: `CP (${cp}W)`,
+            data: [{ x: 0, y: cp }, { x: maxTime, y: cp }],
             borderColor: '#FF9800',
             backgroundColor: 'rgba(255, 152, 0, 0.1)',
             borderWidth: 2,
@@ -542,7 +608,7 @@ function plotData(hrRecords, powerRecords, ftp) {
 function updateChartReferenceLines() {
     if (!chart || !chart.data.datasets) return;
 
-    const ftp = parseInt(document.getElementById('ftpInput').value) || CONFIG.DEFAULT_FTP;
+    const cp = currentCP();
     const maxPeakPower = parseInt(document.getElementById('maxPeakPowerInput').value) || CONFIG.DEFAULT_MAX_PEAK_POWER;
 
     // Find power data to get max time
@@ -551,11 +617,11 @@ function updateChartReferenceLines() {
 
     const maxTime = Math.max(...powerDataset.data.map(p => p.x));
 
-    // Update FTP line
-    const ftpDataset = chart.data.datasets.find(ds => ds.label.includes('FTP'));
-    if (ftpDataset) {
-        ftpDataset.label = `FTP (${ftp}W)`;
-        ftpDataset.data = [{ x: 0, y: ftp }, { x: maxTime, y: ftp }];
+    // Update CP line
+    const cpDataset = chart.data.datasets.find(ds => ds.label.startsWith('CP ('));
+    if (cpDataset) {
+        cpDataset.label = `CP (${cp}W)`;
+        cpDataset.data = [{ x: 0, y: cp }, { x: maxTime, y: cp }];
     }
 
     // Update Max Peak Power line
@@ -577,7 +643,7 @@ function updateChartReferenceLines() {
 function updateWorkoutChartReferenceLines() {
     if (!workoutChart || !workoutChart.data.datasets) return;
 
-    const ftp = parseInt(document.getElementById('ftpInput').value) || CONFIG.DEFAULT_FTP;
+    const cp = currentCP();
     const maxPeakPower = parseInt(document.getElementById('maxPeakPowerInput').value) || CONFIG.DEFAULT_MAX_PEAK_POWER;
 
     // Find workout data to get max time
@@ -586,11 +652,11 @@ function updateWorkoutChartReferenceLines() {
 
     const maxTime = Math.max(...workoutDataset.data.map(p => p.x));
 
-    // Update FTP line
-    const ftpDataset = workoutChart.data.datasets.find(ds => ds.label.includes('FTP'));
-    if (ftpDataset) {
-        ftpDataset.label = `FTP (${ftp}W)`;
-        ftpDataset.data = [{ x: 0, y: ftp }, { x: maxTime, y: ftp }];
+    // Update CP line
+    const cpDataset = workoutChart.data.datasets.find(ds => ds.label.startsWith('CP ('));
+    if (cpDataset) {
+        cpDataset.label = `CP (${cp}W)`;
+        cpDataset.data = [{ x: 0, y: cp }, { x: maxTime, y: cp }];
     }
 
     // Update Max Peak Power line
@@ -1263,15 +1329,15 @@ function plotWorkoutPlan(workout) {
         stepped: true
     }];
 
-    // Add FTP and Max Peak Power reference lines
-    const ftp = parseInt(document.getElementById('ftpInput').value) || CONFIG.DEFAULT_FTP;
+    // Add CP and Max Peak Power reference lines
+    const cp = currentCP();
     const maxPeakPower = parseInt(document.getElementById('maxPeakPowerInput').value) || CONFIG.DEFAULT_MAX_PEAK_POWER;
     const maxTime = Math.max(...workoutData.map(p => p.x));
 
-    // FTP reference line
+    // CP reference line
     datasets.push({
-        label: `FTP (${ftp}W)`,
-        data: [{ x: 0, y: ftp }, { x: maxTime, y: ftp }],
+        label: `CP (${cp}W)`,
+        data: [{ x: 0, y: cp }, { x: maxTime, y: cp }],
         borderColor: '#FF9800',
         backgroundColor: 'rgba(255, 152, 0, 0.1)',
         borderWidth: 2,

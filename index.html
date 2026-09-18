@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Power Curve Tools</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="athlete-profile.js"></script>
     <style>
         .nav-button {
             transition: all 0.3s ease;
@@ -22,6 +23,9 @@
             <h1 class="text-4xl font-bold mb-4">Power Curve Tools</h1>
             <p class="text-xl text-gray-300 mb-8">En samling verktyg för analys av träningsdata och prestation</p>
         </div>
+
+        <!-- Gemensam atletprofil -->
+        <div id="profileCard" class="mb-8 bg-gray-800 bg-opacity-50 p-6 rounded-lg"></div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <a href="power-curve/" class="nav-button bg-gradient-to-br from-blue-700 to-blue-800 p-8 rounded-lg cursor-pointer">
@@ -79,5 +83,64 @@
             </ul>
         </div>
     </div>
+
+    <script>
+        // Verktygen delar en atletprofil i webbläsarens localStorage. Startsidan
+        // äger den inte - den visar vad som finns och kan rensa den, så att det
+        // går att se var siffrorna i de fyra verktygen kommer ifrån.
+        function renderProfile() {
+            const profile = AthleteProfile.load();
+            const card = document.getElementById('profileCard');
+
+            const rows = [];
+            if (profile.cp !== undefined) {
+                rows.push(['CP (Critical Power)', `${Math.round(profile.cp)} W`, 'power-curve/ · wbal/ · fit-analysis/']);
+            }
+            if (profile.wPrime !== undefined) {
+                rows.push(["W' (anaerob kapacitet)", `${(profile.wPrime / 1000).toFixed(1)} kJ`, 'power-curve/ · wbal/']);
+            }
+            if (profile.cs !== undefined) {
+                rows.push(['CS (Critical Speed)', `${(profile.cs * 3.6).toFixed(1)} km/h`, 'running/']);
+            }
+            if (profile.dPrime !== undefined) {
+                rows.push(["D' (anaerob distansreserv)", `${Math.round(profile.dPrime)} m`, 'running/']);
+            }
+
+            if (rows.length === 0) {
+                card.innerHTML = `
+                    <h3 class="text-xl font-semibold mb-2">Atletprofil</h3>
+                    <p class="text-gray-300">Ingen profil sparad ännu. Räkna ut din signatur i
+                    <a href="power-curve/" class="underline text-blue-400">Power Curve Plotter</a> eller
+                    <a href="running/" class="underline text-blue-400">Running Performance</a>, så
+                    återanvänder de andra verktygen värdena automatiskt.</p>`;
+                return;
+            }
+
+            card.innerHTML = `
+                <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+                    <h3 class="text-xl font-semibold">Atletprofil</h3>
+                    <button onclick="clearProfile()"
+                            class="text-sm bg-gray-700 hover:bg-red-700 px-3 py-1 rounded border border-gray-600">Rensa profilen</button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                    ${rows.map(([label, value, users]) => `
+                        <div class="bg-gray-900 bg-opacity-60 p-4 rounded">
+                            <div class="text-sm text-gray-400">${label}</div>
+                            <div class="text-2xl font-bold">${value}</div>
+                            <div class="text-xs text-gray-500 mt-1">${users}</div>
+                        </div>`).join('')}
+                </div>
+                <p class="text-sm text-gray-400">Profilen ligger i den här webbläsaren - inget skickas någonstans, och
+                den följer inte med till en annan dator. FIT-analysen räknar TSS mot FTP = 95 % av CP, så TSS-talen
+                är jämförbara med Strava och TrainingPeaks.</p>`;
+        }
+
+        function clearProfile() {
+            AthleteProfile.clear();
+            renderProfile();
+        }
+
+        renderProfile();
+    </script>
 </body>
 </html>
