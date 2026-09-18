@@ -8,13 +8,17 @@ pull requests, hur det delas i commits, och vad "grönt" betyder i ett repo utan
 Planen lägger inte till några åtgärder. Varje commit nedan pekar på ett fel-ID eller ett
 steg som redan står i [07](07-fel-power-curve.md)–[12](12-omskrivning-wbal.md).
 
+**Beslutsläge: planen körs enligt rekommendationerna.** Nio PR enligt §2, och de fem val som
+dokumentationen lämnar öppna är avgjorda i §5. Alternativen står kvar där, men som motiv till
+ett fattat beslut — inte som något som ska vägas igen.
+
 ---
 
 ## 1. De tre frågorna, besvarade först
 
 ### Behövs flera PR?
 
-**Ja. Minst fem, rekommenderat nio.** Två skäl, och bara det första är tvingande.
+**Ja — nio.** Två skäl, och bara det första är tvingande.
 
 **Tvingande — [12](12-omskrivning-wbal.md) kräver det.** Steg 1–3 sänker föreskriven effekt
 med 1–12 W; steg 4 (CP/FTP) höjer varje siffra med exakt 10,5 W. Släpps de ihop tar de ut
@@ -26,8 +30,9 @@ merge-konflikter mellan dem. En PR per verktyg och åtgärdspaket är den naturl
 den kan granskas, deployas och rullas tillbaka ensam, och den kan verifieras i webbläsaren
 av en människa som bara behöver bry sig om ett verktyg.
 
-Minimiindelningen är fem PR: en per verktyg, plus `wbal/` steg 4 separat. Den rekommenderade
-är nio, av skäl som står vid varje PR i §4.
+Minimiindelningen vore fem PR: en per verktyg, plus `wbal/` steg 4 separat. **Beslutat är
+nio**, av skäl som står vid varje PR i §4 — plus PR 10, som ligger utanför fellistorna och
+har ett eget beslut i §5.
 
 ### Ska allt bygga i varje commit?
 
@@ -78,7 +83,7 @@ om testet tills det passar — det nya värdet kommer ur
 
 ```
 wbal/          PR 1 ──> PR 2 ──> PR 3
-power-curve/   PR 4 ──> PR 5 ─ ─ ─ ─ ─> (PR 10, valfri)
+power-curve/   PR 4 ──> PR 5 ──> PR 10
 running/       PR 6
 fit-analysis/  PR 7 ──> PR 8 ──> PR 9
 ```
@@ -96,7 +101,7 @@ De fyra spåren är oberoende och kan gå parallellt. Inom ett spår är pilarna
 | 7 | `fit-analysis/` | FA-2, FA-1 — de som förvanskar siffror | M | — |
 | 8 | `fit-analysis/` | FA-9, FA-4, FA-8, FA-5, FA-7 | M | PR 7 |
 | 9 | `fit-analysis/` | FA-6, FA-3 — kräver beslut, se §5 | M | PR 7 |
-| 10 | `power-curve/` | [11 §10](11-effekt-duration-protokoll.md) minimivariant. **Valfri.** | L | PR 5 |
+| 10 | `power-curve/` | [11 §10](11-effekt-duration-protokoll.md) minimivariant. Utbyggnad, inte rättelse. | L | PR 5 |
 
 Tre grupperingar är tvingande och kommer ur dokumentationen, inte ur den här planen:
 
@@ -145,14 +150,14 @@ webbläsare. Det måste lösas innan matematiken ändras, annars ändras den ove
 |---|---|---|
 | 1.1 | Flytta mallar, simulering, återhämtning och solver till `wbal/model.js`. `script.js` behåller all DOM-kod och anropar modellen. `index.html` laddar båda. | De 20 mallarna ger identiska watt som kolumnen "Idag" i [12](12-omskrivning-wbal.md) |
 | 1.2 | `wbal/test/model.test.js` med `node --test`: kolumnen "Idag" som snapshot, plus invarianterna | Testerna gröna; `npm test` slutar vara `exit 1` |
-| 1.3 | Valfritt: CI-jobb som kör lint och `node --test` på push | Jobbet grönt på `master` |
+| 1.3 | CI-jobb som kör lint och `node --test` på push. Rätta samtidigt raden om att CI saknar test i [CLAUDE.md](../CLAUDE.md). | Jobbet grönt på `master`; ett avsiktligt brutet test gör det rött |
 
 `model.js` exponeras för båda hållen med ett `module.exports`-skydd i botten — samma
 CommonJS-shim som `fit-analysis/module-loader.js` redan bygger på. Inga nya beroenden:
 `node --test` ingår i Node.
 
-Commit 1.3 ligger utanför dokumentationen och utanför nuvarande CI — den finns med som ett
-val, inte som ett krav. Utan den gäller checklistan i §1 lokalt i stället.
+Commit 1.3 ligger utanför dokumentationen och utanför nuvarande CI, och är den enda punkten i
+planen som ändrar hur repot arbetar snarare än vad det räknar. Den är beslutad — se §5.
 
 ### PR 2 — `wbal/`: steg 1, 2, 3 och 5
 
@@ -241,14 +246,16 @@ och ett markerat värde lär ut mer än inget värde"* ([08](08-fel-running.md))
 | 7.1 | Gör täckningskravet till en riktig kvot: jämför mot filens egen samplingsfrekvens i stället för mot en sekund (`fit-analysis.js:14, 837`) | [FA-2](10-fel-fit-analysis.md) | En fil inspelad med smart recording ger siffror i stället för `N/A` i samtliga rutor |
 | 7.2 | Ta bort 30 W-golvet (`fit-analysis.js:13, 800`). **Behåll interpoleringen av isolerade nollor** — den är sund och löser det problem heuristiken faktiskt var till för. | [FA-1](10-fel-fit-analysis.md) | TSS sjunker på ett pass med frihjulning; ett pass utan nollor är oförändrat |
 
-Alternativ 2 för FA-2 — resampla till 1 Hz före beräkningen — är enligt
-[10](10-fel-fit-analysis.md) den bättre lösningen och det kommersiella verktyg gör, men den
-rör varje fönsterberäkning i filen. Se §5.
+Båda felen har en dyrare fortsättning, och båda är **uppskjutna till efter PR 9** — de hör
+inte hemma i 7.1 och 7.2, som ska vara en kvotfix och en ren borttagning:
 
-FA-1 har en dyrare fortsättning: läs kadens och hastighet ur FIT-filen och skilj äkta
-sensorbortfall från frihjulning. Båda kanalerna finns i filen men läses aldrig in. Det är den
-riktiga lösningen, och den hör hemma i en egen PR efter denna — inte i 7.2, som ska vara en
-ren borttagning.
+- **FA-2:** resampla till 1 Hz före beräkningen. Enligt [10](10-fel-fit-analysis.md) den
+  bättre lösningen och det kommersiella verktyg gör, men den rör varje fönsterberäkning i
+  filen. Se §5.
+- **FA-1:** läs kadens och hastighet ur FIT-filen och skilj äkta sensorbortfall från
+  frihjulning. Båda kanalerna finns i filen men läses aldrig in. Det är den riktiga
+  lösningen på heuristikfelet — 7.2 tar bort det felaktiga golvet, den här punkten ersätter
+  gissningen med data.
 
 ### PR 8 — `fit-analysis/`: konfigurationspaketet och de rena buggarna
 
@@ -277,7 +284,7 @@ möjlighet"* — all data finns redan beräknad.
 9.1 kräver att 7.2 redan är släppt — annars får planerade vilopass ändå 30 W i beräkningen,
 och ändringen ser ut att fungera utan att göra någon skillnad.
 
-### PR 10 — `power-curve/`: minimivarianten ur [11](11-effekt-duration-protokoll.md). Valfri.
+### PR 10 — `power-curve/`: minimivarianten ur [11](11-effekt-duration-protokoll.md)
 
 [11](11-effekt-duration-protokoll.md) är märkt som en **alternativ implementation**, inte som
 en fellista. Hela dokumentet — tre domäner, sex testpunkter, tre testpass — är en utbyggnad
@@ -285,9 +292,11 @@ av verktyget, och [11 §8](11-effekt-duration-protokoll.md) underkänner dessuto
 durability-gren: den producerar `P(60 min)/CP` runt 95–97 % medan dokumentet självt anger
 86–94 % som det band siffran ska hamna i.
 
-**Rekommendation: bygg bara [§10 Minimivarianten](11-effekt-duration-protokoll.md).** Den är
+**Beslutat: bygg bara [§10 Minimivarianten](11-effekt-duration-protokoll.md).** Den är
 tre punkter i 2–15 min, minstakvadratanpassning och en residual — allt som behövs för zoner
-och intervallplanering, och exakt punkt 3 i [PC-5](07-fel-power-curve.md)s åtgärd.
+och intervallplanering, och exakt punkt 3 i [PC-5](07-fel-power-curve.md)s åtgärd. Resten av
+[11](11-effekt-duration-protokoll.md) — Morton-grenen, durability-grenen, Pass B och C —
+byggs inte.
 
 | # | Commit | Grönt av |
 |---|---|---|
@@ -300,30 +309,39 @@ Det löser [PC-3](07-fel-power-curve.md) strukturellt (ingen `t₁ − t₂` i n
 [PC-5](07-fel-power-curve.md) på riktigt, och ger [PC-4](07-fel-power-curve.md) en
 uttrycklig tolkning. 10.2 gör 4.1 överflödig — behåll kontrollen ändå, den kostar inget.
 
-**Bygg inte Morton-grenen med `Pmax` utan att läsa [11 §7](11-effekt-duration-protokoll.md)
-först.** Ett `W′` anpassat med treparametersformen blir 23 % större och betyder något annat
-än tvåparameterns `W′`. Det får inte matas rakt in i `wbal/`, som förutsätter
-tvåparameterdefinitionen. Det är samma tysta enhetsbyte som
-[WB-5](09-fel-wbal.md) handlar om, i en ny förklädnad.
+**Varför Morton-grenen inte ingår, trots att den skulle göra `Pmax` till en riktig peak
+power:** ett `W′` anpassat med treparametersformen blir 23 % större och betyder något annat
+än tvåparameterns `W′` ([11 §7](11-effekt-duration-protokoll.md)). Det får inte matas rakt in
+i `wbal/`, som förutsätter tvåparameterdefinitionen — det vore samma tysta enhetsbyte som
+[WB-5](09-fel-wbal.md) handlar om, i en ny förklädnad. Skulle grenen ändå byggas senare är
+det den frågan som måste lösas först, inte anpassningen.
 
 ---
 
-## 5. Beslut som måste fattas innan koden skrivs
+## 5. Besluten
 
-Fyra ställen där dokumentationen anger två möjliga åtgärder och inte väljer. Alla fyra är
-billigare att bestämma nu än att ändra sen.
+Fem ställen där dokumentationen anger flera möjliga åtgärder och inte väljer. **Samtliga är
+avgjorda enligt rekommendationen.** Alternativen står kvar i tabellen för att motivet ska gå
+att granska — inte för att vägas igen.
 
-| Var | Val | Rekommendation |
+| Var | Alternativ | Beslut |
 |---|---|---|
-| **FA-2** (7.1) | Riktig kvot mot filens samplingsfrekvens, eller resampling till 1 Hz | Kvoten först — den är liten och rättar felet. Resampling är rätt på sikt (NP är *definierad* på 1 Hz-data) men rör varje fönsterberäkning och hör hemma i en egen PR |
-| **FA-3** (9.2) | TSS per fönster, eller rita NP över prefix | TSS per fönster. [10](10-fel-fit-analysis.md): *"Det är nästan säkert vad som var avsett"* |
-| **PC-2** (4.4) | Döp om rutan, eller mät faktisk `Pmax` med Morton | Döp om nu (4.4). Mätningen kräver ett 10-sekunderstest och hör till PR 10 |
-| **[11](11-effekt-duration-protokoll.md)** (PR 10) | Hela protokollet, minimivarianten, eller ingenting | Minimivarianten. Hela protokollet kostar tre testpass och en gren som dokumentet självt underkänner |
+| **FA-2** (7.1) | Riktig kvot mot filens samplingsfrekvens, eller resampling till 1 Hz | **Kvoten.** Den är liten och rättar felet. Resampling är rätt på sikt — NP är *definierad* på 1 Hz-data — men rör varje fönsterberäkning i filen och får en egen PR sist i `fit-analysis/`-spåret, efter PR 9 |
+| **FA-3** (9.2) | TSS per fönster, eller rita NP över prefix | **TSS per fönster.** [10](10-fel-fit-analysis.md): *"Det är nästan säkert vad som var avsett"* |
+| **PC-2** (4.4) | Döp om rutan, eller mät faktisk `Pmax` med Morton | **Döp om**, i 4.4. Mätningen kräver ett 10-sekunderstest, och Morton-grenen byggs inte alls — se raden nedan |
+| **[11](11-effekt-duration-protokoll.md)** (PR 10) | Hela protokollet, minimivarianten, eller ingenting | **Minimivarianten.** Hela protokollet kostar tre testpass och en gren som dokumentet självt underkänner ([11 §8](11-effekt-duration-protokoll.md)) |
+| **CI-jobbet** (1.3) | Med eller utan | **Med.** Se nedan |
 
-Och en fråga som planen inte kan svara på: **ska 1.3 finnas?** Ett CI-jobb som kör lint och
-`node --test` går emot *"ingen build eller test i CI"* i [CLAUDE.md](../CLAUDE.md), men är det
-enda som gör kravet "grönt i varje commit" kontrollerbart för någon annan än den som skrev
-commiten. Den kostar ett 20-raders workflow och noll nya beroenden.
+**1.3 är beslutet med en kostnad.** Ett CI-jobb som kör lint och `node --test` går emot
+*"Det finns inget build- eller teststeg i CI"* i [CLAUDE.md](../CLAUDE.md), och den raden
+måste då rättas i samma commit. Skälet att ta den kostnaden: kravet *"allt ska bygga i varje
+commit"* är annars kontrollerbart bara för den som skrev commiten, och varje commit här
+deployas direkt till Pages. Jobbet kostar ett 20-raders workflow och noll nya beroenden —
+`node --test` ingår i Node, och eslint och jshint finns redan i `wbal/node_modules/`.
+
+Två saker som beslutet **inte** omfattar: det införs inget byggsteg, och det läggs inga
+tester på de tre verktyg som är enfilade HTML-sidor. Endast `wbal/`, som ändå måste brytas
+isär i PR 1 för att [12](12-omskrivning-wbal.md)s åtta regressionstester ska gå att köra.
 
 ---
 
