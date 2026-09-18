@@ -11,7 +11,7 @@ const CONFIG = {
 
     // Data processing constants
     MIN_POWER_DROPOUT: 30,      // Minimum power value for dropout replacement
-    WINDOW_COVERAGE_THRESHOLD: 0.5 // Minimum coverage ratio for window averaging
+    WINDOW_COVERAGE_THRESHOLD: 0.5 // Minimum share of a window that must be covered by samples
 };
 
 // Dynamic TSS configurations - can be modified at runtime
@@ -830,11 +830,18 @@ function computeNP_by_time(rawPowerData, ftp, windowSecondsList = TSS_WINDOW_SEC
         const averages = [];
         const stepSize = Math.max(1, Math.floor(windowSec / 60)); // Adaptive step size
 
+        // Täckningskravet är en kvot, och en kvot jämför två storheter av samma slag.
+        // Förväntat antal punkter kommer ur filens egen samplingsfrekvens, inte ur
+        // antagandet att den spelar in en gång per sekund (FA-2). Annars uppfyller en
+        // helt komplett fil inspelad glesare än varannan sekund - vilket smart
+        // recording producerar - aldrig villkoret, och samtliga fönster kastas.
+        const minPoints = windowSec * avgSamplingHz * CONFIG.WINDOW_COVERAGE_THRESHOLD;
+
         for (let start = firstTs; start + windowSec <= lastTs; start += stepSize) {
             const end = start + windowSec;
             const windowPoints = powerData.filter(p => p.t >= start && p.t < end);
 
-            if (windowPoints.length >= windowSec * CONFIG.WINDOW_COVERAGE_THRESHOLD) { // Need reasonable coverage
+            if (windowPoints.length >= minPoints) {
                 const avg = windowPoints.reduce((sum, p) => sum + p.p, 0) / windowPoints.length;
                 averages.push(avg);
             }
