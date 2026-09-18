@@ -53,22 +53,22 @@
         <div id="signature" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div class="bg-gradient-to-br from-red-600 to-red-700 p-4 rounded-lg text-center">
                 <div class="text-sm text-red-200 mb-1">Högsta testeffekt</div>
-                <div id="maxTestPowerValue" class="text-2xl lg:text-3xl font-bold">400W</div>
+                <div id="maxTestPowerValue" class="text-2xl lg:text-3xl font-bold">–</div>
                 <div class="text-xs text-red-200 mt-1">den högre av dina två insatser</div>
             </div>
             <div class="bg-gradient-to-br from-orange-600 to-orange-700 p-4 rounded-lg text-center">
                 <div class="text-sm text-orange-200 mb-1">HIE (High Intensity Energy)</div>
-                <div id="hieValue" class="text-2xl lg:text-3xl font-bold">3.0kJ</div>
-                <div id="hieJoule" class="text-xs text-orange-200 mt-1">3000 joule</div>
+                <div id="hieValue" class="text-2xl lg:text-3xl font-bold">–</div>
+                <div id="hieJoule" class="text-xs text-orange-200 mt-1">–</div>
             </div>
             <div class="bg-gradient-to-br from-green-600 to-green-700 p-4 rounded-lg text-center">
                 <div class="text-sm text-green-200 mb-1">TP (Threshold Power)</div>
-                <div id="tpValue" class="text-2xl lg:text-3xl font-bold">270W</div>
+                <div id="tpValue" class="text-2xl lg:text-3xl font-bold">–</div>
             </div>
             <div class="bg-gradient-to-br from-purple-600 to-purple-700 p-4 rounded-lg text-center">
                 <div class="text-sm text-purple-200 mb-1">Maximalt arbete på 1 h</div>
-                <div id="maxWorkValue" class="text-2xl lg:text-3xl font-bold">982kJ</div>
-                <div id="maxWorkAvg" class="text-xs text-purple-200 mt-1">≈ 273W snitt</div>
+                <div id="maxWorkValue" class="text-2xl lg:text-3xl font-bold">–</div>
+                <div id="maxWorkAvg" class="text-xs text-purple-200 mt-1">–</div>
             </div>
         </div>
 
@@ -93,12 +93,16 @@
             <p class="mb-2"><strong>Power vs Duration (vänster):</strong> Hyperbolisk kurva <span class="text-blue-400 font-mono">P(t) = TP + HIE/t</span></p>
             <p class="mb-3"><strong>Work vs Duration (höger):</strong> Linjär kurva <span class="text-purple-400 font-mono">W(t) = TP × t + HIE</span></p>
             <div id="pointInfo">
-                <p>• <span class="text-yellow-400">Punkt 1:</span> 400W @ 30s = 12.0kJ (12000J)</p>
-                <p>• <span class="text-blue-400">Punkt 2:</span> 280W @ 300s = 84.0kJ (84000J)</p>
+                <p>• <span class="text-yellow-400">Punkt 1:</span> –</p>
+                <p>• <span class="text-blue-400">Punkt 2:</span> –</p>
             </div>
-            <p class="mt-2">• <span class="text-green-400">TP (270W)</span> = Lutningen på den linjära kurvan</p>
-            <p>• <span class="text-orange-400">HIE (3.0kJ = 3000J)</span> = Y-intercept på den linjära kurvan</p>
-            <p>• <span class="text-purple-400">Area under kurvan (0-1h):</span> Total energi som kan produceras = 982kJ</p>
+            <p class="mt-2">• <span class="text-green-400">TP</span> = Lutningen på den linjära kurvan: <span id="tpInline">–</span></p>
+            <p>• <span class="text-orange-400">HIE</span> = Y-intercept på den linjära kurvan: <span id="hieInline">–</span></p>
+            <p>• <span class="text-purple-400">Maximalt arbete på 1 h</span> = W(3600) = TP × 3600 + HIE: <span id="maxWorkInline">–</span></p>
+            <p class="mt-3 text-white"><strong>🧪 Testprotokoll:</strong> använd <strong>två maximala insatser mellan 3 och 12 minuter</strong>,
+                med <strong>minst 3 minuters skillnad</strong> i längd. Verktygets defaultvärden, 210 s och 630 s, ligger mitt i
+                modellens giltiga domän. Kortare insatser än ~2 minuter domineras av neuromuskulär effekt som modellen inte
+                beskriver, och blåser upp HIE; ligger testtiderna nära varandra svänger TP kraftigt av små mätfel.</p>
         </div>
     </div>
 
@@ -124,10 +128,12 @@
 
         // Inga siffror alls hellre än siffror som inte hör ihop med inmatningen.
         function blankSignature() {
-            const ids = ['maxTestPowerValue', 'hieValue', 'hieJoule', 'tpValue', 'maxWorkValue', 'maxWorkAvg'];
+            const ids = ['maxTestPowerValue', 'hieValue', 'hieJoule', 'tpValue', 'maxWorkValue',
+                'maxWorkAvg', 'tpInline', 'hieInline', 'maxWorkInline'];
             ids.forEach(id => {
                 document.getElementById(id).textContent = '–';
             });
+            updatePointInfo();
         }
 
         function calculateCurve() {
@@ -204,6 +210,15 @@
             document.getElementById('maxWorkValue').textContent = `${(currentData.maxWork1h / 1000).toFixed(0)}kJ`;
             document.getElementById('maxWorkAvg').textContent = `≈ ${Math.round(currentData.maxWork1h / 3600)}W snitt`;
 
+            // Samma tal i förklaringen som i rutorna - inget hårdkodat exempel (PC-6).
+            document.getElementById('tpInline').textContent = `${currentData.tp}W`;
+            document.getElementById('hieInline').textContent = `${(currentData.hie / 1000).toFixed(1)}kJ (${currentData.hie}J)`;
+            document.getElementById('maxWorkInline').textContent = `${(currentData.maxWork1h / 1000).toFixed(0)}kJ`;
+
+            updatePointInfo();
+        }
+
+        function updatePointInfo() {
             const p1w = Number(document.getElementById('point1Watts').value);
             const p1s = Number(document.getElementById('point1Seconds').value);
             const p2w = Number(document.getElementById('point2Watts').value);
