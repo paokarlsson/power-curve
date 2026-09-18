@@ -159,6 +159,21 @@
 
             const CP = (P1 * t1 - P2 * t2) / (t1 - t2);
             const Wprime = (P1 - CP) * t1;
+
+            // Negativ HIE är modellens enda inbyggda kvalitetskontroll (PC-4): den
+            // korta insatsen gav mindre totalt arbete än den långa, vilket är
+            // fysiologiskt omöjligt om båda var maximala. Visa tolkningen, inte talet.
+            if (Wprime <= 0) {
+                showMessage(`<strong>Negativ HIE – testpunkterna är inkonsekventa.</strong>
+                    Den korta insatsen gav mindre totalt arbete än den långa, vilket betyder att
+                    minst ett av testerna inte var maximalt: antingen sparade du dig i det korta
+                    eller pressade dig ovanligt hårt i det långa.
+                    Beräkningen ger TP ${Math.round(CP)} W och HIE ${Math.round(Wprime)} J.
+                    Gör om det test du tror var svagast.`);
+                blankSignature();
+                return;
+            }
+
             const PP = Math.max(P1, P2);
 
             const T = 3600;
