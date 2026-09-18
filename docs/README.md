@@ -47,6 +47,10 @@ ska rättas, med acceptanskriterier och mätt utfall före och efter:
   villkor för genomförbarhet och dosering, vidgat sökintervall med lösarstatus. Innehåller
   mätt före/efter för alla 20 mallar, och tre justeringar av planens egna
   acceptanskriterier.
+- **[13 — Genomförandeplan](13-genomforandeplan.md)** — hur hela dokumentationen genomförs:
+  indelning i nio pull requests, en commit per fel-ID, och vad "grönt" betyder i ett repo
+  utan byggsteg. Svarar också på vilka PR-gränser som är tvingande och vilka som bara är
+  bekväma.
 
 ## Var felen sitter
 
