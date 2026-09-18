@@ -1015,45 +1015,71 @@ function computeNP_by_time(rawPowerData, ftp, windowSecondsList = TSS_WINDOW_SEC
     return results;
 }
 
-// Calculate TSS accumulation over time for multiple time windows
+// Ackumulerad TSS över tid, räknad per bit av passet i stället för per prefix
+// (FA-3). Den gamla kurvan körde hela NP-beräkningen om från passets början vid
+// varje punkt, alltså en fullständig omanpassning över allt som hittills hänt. En
+// hård insats tidigt räknades då om mot ett växande underlag och fortsatte ge
+// tillskott långt efter att den var över: kurvan växte som roten ur tiden, för
+// alltid, även om atleten stannade helt.
+//
+// NP och TSS är definierade för ett helt pass, som en sammanfattning i efterhand,
+// inte som funktioner av förfluten tid. Här delas passet därför i bitar, varje bit
+// får sin egen dos beräknad isolerat, och bitarna summeras. Då är kurvan en äkta
+// löpande summa: varje minut bidrar en gång, och kurvan planar ut när arbetet
+// upphör.
+const ACCUMULATION_SLICE = 60; // sekunder per bit
+
+// En bit kan inte vara kortare än fönstret som ska mätas i den. För fönster som
+// är minst lika långa som biten blir NP över en enda fönsterbredd definitionsmässigt
+// bitens medeleffekt, vilket är precis vad baslinjegrenen (-1) räknar.
+function sliceTSS(slice, windowSeconds, ftp, powerExponent) {
+    if (!slice || slice.length < 2) return 0;
+
+    const useRolling = windowSeconds > 0 && windowSeconds < ACCUMULATION_SLICE;
+    const window = useRolling ? windowSeconds : -1;
+    const result = computeNP_by_time(slice, ftp, [window], powerExponent);
+    const data = result.windows[window];
+
+    return data && data.TSS ? data.TSS : 0;
+}
+
 function calculateTSSAccumulation(powerData, ftp, powerExponent) {
     if (!powerData || powerData.length < 2) return null;
 
-    const duration = powerData[powerData.length - 1].t - powerData[0].t;
-    const sampleInterval = 30; // Calculate TSS every 30 seconds
+    const firstTs = powerData[0].t;
+    const duration = powerData[powerData.length - 1].t - firstTs;
+
     const timestamps = [];
+    for (let t = ACCUMULATION_SLICE; t <= duration; t += ACCUMULATION_SLICE) {
+        timestamps.push(t / 60); // Convert to minutes for chart
+    }
+
     const tssData = {};
 
-    // Initialize data arrays for each TSS window type
-    Object.keys(TSS_CONFIGS).forEach(windowType => {
-        const config = TSS_CONFIGS[windowType];
-        tssData[config.elementId] = [];
+    Object.values(TSS_CONFIGS).forEach(config => {
+        const sliceSec = Math.max(ACCUMULATION_SLICE, config.seconds);
+        const series = [];
+
+        let accumulated = 0;
+        let sliceStart = firstTs;
+        let boundary = sliceSec;
+
+        timestamps.forEach(minutes => {
+            const elapsed = minutes * 60;
+
+            // Summera de bitar som hunnit bli fullständiga
+            while (elapsed >= boundary) {
+                const slice = powerData.filter(p => p.t >= sliceStart && p.t < firstTs + boundary);
+                accumulated += sliceTSS(slice, config.seconds, ftp, powerExponent);
+                sliceStart = firstTs + boundary;
+                boundary += sliceSec;
+            }
+
+            series.push(accumulated > 0 ? Math.round(accumulated * 10) / 10 : null);
+        });
+
+        tssData[config.elementId] = series;
     });
-
-    // Calculate TSS at regular intervals
-    for (let t = sampleInterval; t <= duration; t += sampleInterval) {
-        timestamps.push(t / 60); // Convert to minutes for chart
-
-        // Get power data up to this point
-        const currentData = powerData.filter(p => p.t <= t);
-
-        if (currentData.length > 10) { // Need some data to calculate
-            // Calculate TSS for each window type up to this point
-            const tssResults = computeNP_by_time(currentData, ftp, getTSSWindowSeconds(), powerExponent);
-
-            Object.entries(TSS_CONFIGS).forEach(([windowType, config]) => {
-                const windowData = tssResults.windows[config.seconds];
-                const tssValue = windowData && windowData.TSS ? windowData.TSS : null;
-                tssData[config.elementId].push(tssValue);
-            });
-        } else {
-            // Not enough data yet
-            Object.keys(TSS_CONFIGS).forEach(windowType => {
-                const config = TSS_CONFIGS[windowType];
-                tssData[config.elementId].push(null);
-            });
-        }
-    }
 
     return {
         timestamps,
