@@ -52,8 +52,9 @@
         <!-- Fitness Signature -->
         <div id="signature" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div class="bg-gradient-to-br from-red-600 to-red-700 p-4 rounded-lg text-center">
-                <div class="text-sm text-red-200 mb-1">PP (Peak Power)</div>
-                <div id="ppValue" class="text-2xl lg:text-3xl font-bold">400W</div>
+                <div class="text-sm text-red-200 mb-1">Högsta testeffekt</div>
+                <div id="maxTestPowerValue" class="text-2xl lg:text-3xl font-bold">400W</div>
+                <div class="text-xs text-red-200 mt-1">den högre av dina två insatser</div>
             </div>
             <div class="bg-gradient-to-br from-orange-600 to-orange-700 p-4 rounded-lg text-center">
                 <div class="text-sm text-orange-200 mb-1">HIE (High Intensity Energy)</div>
@@ -103,7 +104,7 @@
 
     <script>
         let powerChart, workChart;
-        let currentData = { tp: 0, hie: 0, pp: 0, maxWork1h: 0 };
+        let currentData = { tp: 0, hie: 0, maxTestPower: 0, maxWork1h: 0 };
 
         function formatTime(seconds) {
             return `${Math.round(seconds)}s`;
@@ -123,7 +124,7 @@
 
         // Inga siffror alls hellre än siffror som inte hör ihop med inmatningen.
         function blankSignature() {
-            const ids = ['ppValue', 'hieValue', 'hieJoule', 'tpValue', 'maxWorkValue', 'maxWorkAvg'];
+            const ids = ['maxTestPowerValue', 'hieValue', 'hieJoule', 'tpValue', 'maxWorkValue', 'maxWorkAvg'];
             ids.forEach(id => {
                 document.getElementById(id).textContent = '–';
             });
@@ -174,7 +175,9 @@
                 return;
             }
 
-            const PP = Math.max(P1, P2);
+            // Tvåparametersmodellen har ingen peak power - kurvan divergerar när t → 0.
+            // Rutan visar bara den högre av de två inmatade effekterna (PC-2).
+            const maxTestPower = Math.max(P1, P2);
 
             // Modellen är formulerad i arbete: W(t) = TP · t + HIE. Frågan "hur mycket
             // orkar jag på en timme" besvaras genom att sätta t = 3600, inte genom att
@@ -185,7 +188,7 @@
             currentData = {
                 tp: Math.round(CP),
                 hie: Math.round(Wprime),
-                pp: Math.round(PP),
+                maxTestPower: Math.round(maxTestPower),
                 maxWork1h: maxWork1h
             };
 
@@ -194,7 +197,7 @@
         }
 
         function updateDisplayValues() {
-            document.getElementById('ppValue').textContent = `${currentData.pp}W`;
+            document.getElementById('maxTestPowerValue').textContent = `${currentData.maxTestPower}W`;
             document.getElementById('hieValue').textContent = `${(currentData.hie / 1000).toFixed(1)}kJ`;
             document.getElementById('hieJoule').textContent = `${currentData.hie.toFixed(0)} joule`;
             document.getElementById('tpValue').textContent = `${currentData.tp}W`;
