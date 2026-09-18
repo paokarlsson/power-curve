@@ -2,10 +2,14 @@
 
 Alla fel i Critical Speed-verktyget. Berör en enda fil: **`running/index.html`**.
 
-Detta är repots friskaste verktyg. Det har **inga implementationsfel alls** — beräkningarna
-är korrekta, indata valideras, och `t₁ = t₂` kontrolleras (rad 367), vilket effektverktyget
-inte gör. Samtliga fel nedan är **modell- eller metodgränser**: koden gör exakt rätt sak,
-men modellen används utanför det område där den gäller.
+Detta är repots friskaste verktyg. Beräkningarna är korrekta, indata valideras, och
+`t₁ = t₂` kontrolleras (rad 367), vilket effektverktyget inte gör. RUN-1 till RUN-4 är
+**modell- eller metodgränser**: koden gör exakt rätt sak, men modellen används utanför det
+område där den gäller.
+
+**[Justerat]** Listan sa ursprungligen att verktyget saknar implementationsfel helt. Det
+höll inte: **RUN-5** nedan är en ren avrundningsbugg i tempovisningen, hittad när RUN-1 till
+RUN-4 åtgärdades. Den var kosmetisk men syntes på förstasidan.
 
 **Inget är åtgärdat.** Siffrorna är uppmätta genom att köra koden.
 
@@ -24,6 +28,7 @@ men modellen används utanför det område där den gäller.
 | **RUN-2** | Korta distanser saknar övre hastighetsgräns | 415–416, 429 | **Modellfel** | `v(t) → ∞` när `t → 0` |
 | **RUN-3** | Tvåpunktsmetoden förstärker mätfel | 373–375 | **Metodgräns** | ingen residual, ingen konfidens |
 | **RUN-4** | "Maximal distans (1 h)" extrapolerar utanför domänen | 383 | **Modellfel** (mildt) | 3× utanför anpassningsintervallet |
+| **RUN-5** | `formatPace` kan visa `3:60/km` | 340–346 | **Implementationsfel** | kosmetiskt, men syns på defaultvärdena |
 
 ---
 
@@ -203,17 +208,50 @@ lita på.
 
 ---
 
+## RUN-5 — `formatPace` kan visa `3:60/km`
+
+**Rad 340–346:** `const secs = Math.round(secsPerKm % 60);`
+
+### Vad koden gör
+
+Delar sekunder per kilometer i minuter och sekunder, och avrundar **resten** för sig.
+
+### Varför det är fel
+
+Minuterna tas med `Math.floor` före avrundningen, sekunderna efter. Ett tempo vars sekunddel
+ligger strax under 60 hamnar därför i den lägre minuten med 60 sekunder:
+
+```
+5000 m på 1200 s  ->  4,1667 m/s  ->  239,9999… s/km  ->  3:60/km
+```
+
+Felet syns på verktygets egna defaultvärden, i 5 km-raden i prediktionstabellen. Ren
+implementationsbugg, och den enda i verktyget.
+
+### Åtgärd
+
+Avrunda sekunderna per kilometer **först**, dela upp sedan:
+
+```
+const secsPerKm = Math.round(1000 / metersPerSec);
+const mins = Math.floor(secsPerKm / 60);
+const secs = secsPerKm % 60;
+```
+
+---
+
 ## Sammanfattning: modell mot implementation
 
 | | Fel |
 |---|---|
 | **Modellfel** — kan inte kodas bort | RUN-1 (modellen saknar uthållighetsbegränsning), RUN-2 (ingen övre hastighetsgräns), RUN-4 (extrapolation) |
 | **Metodgräns** — kan bara synliggöras | RUN-3 (tvåpunktsförstärkning) |
-| **Implementationsfel** | **inga** |
+| **Implementationsfel** — ren buggfix | RUN-5 (avrundningen i `formatPace`) |
 
-**Det viktigaste att förstå:** det finns ingenting att buggfixa här. Koden är korrekt.
-Samtliga fel uppstår i gränssnittet mellan en modell som gäller i 2–15 minuter och ett
-gränssnitt som presenterar maratontider med samma självförtroende som 5 km-tider.
+**Det viktigaste att förstå:** bortsett från RUN-5, som är kosmetisk, finns ingenting att
+buggfixa här. Beräkningarna är korrekta. Felen uppstår i gränssnittet mellan en modell som
+gäller i 2–15 minuter och ett gränssnitt som presenterar maratontider med samma
+självförtroende som 5 km-tider.
 
 **Alla fyra åtgärder är därför samma åtgärd:** visa var modellen gäller. En enda visuell
 markering — grönt inom domänen, grått utanför — skulle lösa RUN-1, RUN-2 och RUN-4 på en

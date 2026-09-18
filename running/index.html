@@ -411,9 +411,12 @@
 
         function formatPace(metersPerSec) {
             if (metersPerSec <= 0) return '0:00/km';
-            const secsPerKm = 1000 / metersPerSec;
+            // Avrunda sekunderna per kilometer först och dela sedan upp. Att runda
+            // resten för sig gav 3:60/km, eftersom 239,9999 s/km blev 3 minuter och
+            // 60 sekunder i stället för 4:00.
+            const secsPerKm = Math.round(1000 / metersPerSec);
             const mins = Math.floor(secsPerKm / 60);
-            const secs = Math.round(secsPerKm % 60);
+            const secs = secsPerKm % 60;
             return `${mins}:${secs.toString().padStart(2, '0')}/km`;
         }
 
