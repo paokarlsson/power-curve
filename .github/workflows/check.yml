@@ -1,0 +1,33 @@
+name: Kontroller
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wbal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # wbal/node_modules är committat - inget npm install behövs
+      - name: Syntax
+        working-directory: .
+        run: |
+          find . -name '*.js' -not -path './wbal/node_modules/*' -print0 \
+            | xargs -0 -n1 node --check
+
+      - name: Lint
+        run: |
+          npx eslint script.js model.js
+          npx jshint script.js model.js
+
+      - name: Tester
+        run: npm test
