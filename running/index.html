@@ -327,6 +327,14 @@
                 <span style="color: #9CA3AF">streckade och gråmarkerade</span> och ska läsas med
                 markeringen på kortet. Talen är desamma - det är tilliten till dem som skiljer.
             </p>
+            <p class="prediction-legend">
+                <strong style="color: white">Lång ände (halvmara, mara):</strong> modellen låter tempot närma sig CS
+                <em>uppifrån</em>, så den predikterade hastigheten är alltid snabbare än CS - för varje distans.
+                Verkligheten är den omvända: maraton springs <em>under</em> CS, eftersom substrattillgång,
+                värmereglering och muskelskada begränsar långt innan den aeroba kapaciteten gör det. Ingen av de
+                mekanismerna finns i modellen, så felet är strukturellt och åt ett enda håll, och det växer med
+                distansen. Läs de långa tiderna som <strong>"aldrig snabbare än så här"</strong>.
+            </p>
         </div>
 
         <!-- Charts Section -->
@@ -439,6 +447,12 @@
             }
         }
 
+        // Vad markeringen betyder i respektive ände av domänen.
+        const DOMAIN_MARKS = {
+            short: 'utanför modellens giltighet',
+            long: 'utanför giltigheten – läs som ett <strong>tak</strong>, aldrig som en prognos'
+        };
+
         function generatePredictions(CS, Dprime) {
             // Läsregeln ur docs/02-critical-speed.md §3: lita på 3 km-10 km, läs
             // 800 m/1500 m som "minst så snabbt" och halvmara/mara som "aldrig
@@ -471,7 +485,7 @@
                         <div class="prediction-distance">${dist.name}</div>
                         <div class="prediction-time">${formatRaceTime(time)}</div>
                         <div class="prediction-pace">${pace}</div>
-                        ${dist.domain === 'trusted' ? '' : '<div class="prediction-mark">utanför modellens giltighet</div>'}
+                        ${dist.domain === 'trusted' ? '' : `<div class="prediction-mark">${DOMAIN_MARKS[dist.domain]}</div>`}
                     `;
                     grid.appendChild(item);
                 }
