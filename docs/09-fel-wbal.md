@@ -316,6 +316,12 @@ passen lättare är svårt att upptäcka, eftersom resultatet ser konsekvent ut.
 
 ### Åtgärd
 
+**Genomfört, och därefter längre än så.** Först fick fältet etiketten `CP (Critical Power)`
+plus en källväljare som räknade om ett inmatat FTP med `CP ≈ FTP / 0,95`. Sedan togs FTP
+bort ur repot helt: fältet tar bara CP, omräkningen finns inte längre i `model.js`, och CP
+hämtas i första hand ur den gemensamma atletprofilen. Nedanstående beskriver alltså det
+ursprungliga felet, inte verktyget som det ser ut idag.
+
 **Kort sikt:** ändra etiketten till bara `CP (Critical Power)` och lägg till en förklaring
 om att det inte är samma sak som FTP från ett 20-minuterstest. Ett fält som accepterar fel
 storhet utan att säga till är värre än ett som kräver rätt.

@@ -5,7 +5,7 @@
 // Configuration constants - centralized values
 const CONFIG = {
     // Default values
-    DEFAULT_CP: 210,            // Default CP value in watts (ger FTP 200 W, verktygets gamla default)
+    DEFAULT_CP: 200,            // Default CP value in watts - samma som wbal/
     DEFAULT_MAX_PEAK_POWER: 500, // Default max peak power in watts
     DEFAULT_POWER_EXPONENT: 4, // Power exponent for NP calculations
 
@@ -83,46 +83,39 @@ function createDefaultTSSConfigs() {
 // Dynamic TSS configurations - can be modified at runtime
 let TSS_CONFIGS = createDefaultTSSConfigs();
 
-// Passmålen anges relativt FTP (FA-6). TSS är per definition redan normaliserad
-// mot FTP, så ett pass som beskrivs relativt får en planerad TSS som är identisk
-// för alla atleter - vilket är precis vad man vill när pass delas eller
-// återanvänds. Absoluta watt knöt passet till en atlet vid en tidpunkt:
-// exempelpasset "4x4 Threshold" föreskrev 250 W, alltså 125 % av standard-FTP
-// 200 W, vilket är VO2max-intensitet och inte tröskel.
+// Passmålen anges relativt CP (FA-6). TSS normaliseras mot samma CP, så ett pass
+// som beskrivs relativt får en planerad TSS som är identisk för alla atleter -
+// vilket är precis vad man vill när pass delas eller återanvänds. Absoluta watt
+// knöt passet till en atlet vid en tidpunkt: exempelpasset "4x4 Threshold"
+// föreskrev 250 W, alltså 125 % av verktygets standardvärde, vilket är
+// VO2max-intensitet och inte tröskel.
 //
 // targetPercent: 0 är tillåtet så att äkta vila går att uttrycka. Det förutsätter
 // att 30 W-golvet är borta (7.2), annars räknas vilan ändå som 30 W och ändringen
 // ser ut att fungera utan att göra någon skillnad.
-function segmentPercent(target, ftp) {
+function segmentPercent(target, cp) {
     if (!target) return 0;
     if (typeof target.targetPercent === 'number') return target.targetPercent;
     // Äldre passfiler med absoluta watt läses fortfarande
-    if (typeof target.targetWatt === 'number') return ftp > 0 ? target.targetWatt / ftp : 0;
+    if (typeof target.targetWatt === 'number') return cp > 0 ? target.targetWatt / cp : 0;
     return 0;
 }
 
-function segmentWatt(target, ftp) {
-    return Math.round(segmentPercent(target, ftp) * ftp);
+function segmentWatt(target, cp) {
+    return Math.round(segmentPercent(target, cp) * cp);
 }
 
-// Verktyget frågar efter CP, inte FTP. CP är den storhet som mäts i power-curve/
-// och som resten av repot delar via atletprofilen; FTP är ett mätrecept ovanpå
-// samma fysiologi (typiskt 95 % av ett 20-minuterstest) och ligger något under.
-// Samma tumregel och samma konstant som wbal/model.js, se docs/12 steg 4.
-const FTP_OF_CP = 0.95;
-
+// CP är verktygets enda takeffekt: passmålen anges i procent av den, TSS
+// normaliseras mot den, och referenslinjen ritas på den. Det är samma CP som
+// mäts i power-curve/ och delas via atletprofilen.
+//
+// TSS blir därmed (t/3600)·(NP/CP)²·100, alltså 100 poäng per timme på CP.
+// Coggans ursprungliga definition har FTP i nämnaren, och eftersom CP ligger
+// över FTP ger verktyget lägre tal än Strava och TrainingPeaks för samma pass -
+// omkring 10 % lägre. Talen är interna och jämförs mot varandra, inte utåt.
+// Se docs/03-normalized-power-och-tss.md §1.
 function currentCP() {
     return parseInt(document.getElementById('cpInput').value) || CONFIG.DEFAULT_CP;
-}
-
-// TSS räknas mot FTP, aldrig mot CP. Coggans definition är IF = NP/FTP och
-// TSS = (t/3600)·IF²·100, alltså 100 poäng per timme på FTP - det är den
-// definition Strava, TrainingPeaks och WKO använder, och som gör TSS@30s
-// jämförbar utåt (FA-5). Byttes nämnaren mot CP skulle varje TSS-tal i
-// verktyget sjunka med ~10 % och sluta betyda samma sak som överallt annars.
-// Inmatningen är alltså CP; nämnaren härleds ur den.
-function currentFTP() {
-    return Math.round(currentCP() * FTP_OF_CP);
 }
 
 // Profilen ligger i webbläsarens localStorage, per dator och per webbläsare.
@@ -146,10 +139,10 @@ function onCPChanged() {
 
     recalculateWithNewSettings();
 
-    // Passchemat beror på CP i båda ändar: målen anges i procent av FTP, som
-    // härleds ur CP, och referenslinjen ritas på CP. Det ritas därför om i sin
-    // helhet - recalculateWithNewSettings avbryter helt om ingen effektfil är
-    // inläst, och uppdaterar annars bara referenslinjerna, inte målwatten.
+    // Passchemat beror på CP i båda ändar: målen anges i procent av CP, och
+    // referenslinjen ritas på CP. Det ritas därför om i sin helhet -
+    // recalculateWithNewSettings avbryter helt om ingen effektfil är inläst, och
+    // uppdaterar annars bara referenslinjerna, inte målwatten.
     if (currentWorkout) {
         plotWorkoutPlan(currentWorkout);
     }
@@ -163,9 +156,8 @@ function showCPHint(fromProfile) {
         : `Ingen atletprofil hittad - fältet visar standardvärdet.
            Mät CP i <a href="../power-curve/">Power Curve Plotter</a>, så fylls det i här automatiskt.`;
 
-    hint.innerHTML = `${source} TSS räknas mot FTP = ${Math.round(FTP_OF_CP * 100)} % av CP
-        = ${currentFTP()} W, så siffrorna är jämförbara med Strava och TrainingPeaks.
-        Passmålen nedan anges i procent av samma FTP.`;
+    hint.innerHTML = `${source} Passmålen anges i procent av CP, och TSS normaliseras
+        mot samma CP - 100 poäng motsvarar en timme på CP.`;
 }
 
 // Function to get current TSS window seconds array
@@ -269,9 +261,9 @@ document.getElementById('fitFile').addEventListener('change', function (e) {
                 // Store power records for recalculation
                 currentPowerRecords = powerRecords;
 
-                const ftp = currentFTP();
+                const cp = currentCP();
                 // No HR data from CSV, pass empty array
-                plotData([], powerRecords, ftp);
+                plotData([], powerRecords, cp);
 
             } else {
                 // Parse FIT file
@@ -302,8 +294,8 @@ document.getElementById('fitFile').addEventListener('change', function (e) {
                     // Store power records for recalculation
                     currentPowerRecords = powerRecords;
 
-                    const ftp = currentFTP();
-                    plotData(hrRecords, powerRecords, ftp);
+                    const cp = currentCP();
+                    plotData(hrRecords, powerRecords, cp);
                 });
             }
         } catch (err) {
@@ -322,11 +314,11 @@ function recalculateWithNewSettings() {
     console.log('recalculateWithNewSettings called, currentPowerRecords:', !!currentPowerRecords);
     if (!currentPowerRecords) return; // No data loaded yet
 
-    const ftp = currentFTP();
-    console.log('Recalculating with FTP:', ftp);
+    const cp = currentCP();
+    console.log('Recalculating with CP:', cp);
 
     // Recalculate TSS values and redraw chart with new reference lines
-    recalculateTSS(currentPowerRecords, ftp);
+    recalculateTSS(currentPowerRecords, cp);
 
     // Update chart reference lines if chart exists
     if (chart && chart.data.datasets.length > 0) {
@@ -334,8 +326,8 @@ function recalculateWithNewSettings() {
     }
 }
 
-function recalculateTSS(powerRecords, ftp) {
-    console.log('recalculateTSS called with', powerRecords.length, 'records, FTP:', ftp);
+function recalculateTSS(powerRecords, cp) {
+    console.log('recalculateTSS called with', powerRecords.length, 'records, CP:', cp);
     if (powerRecords.length === 0) return;
 
     // Convert to timestamp-power format for calculation
@@ -351,7 +343,7 @@ function recalculateTSS(powerRecords, ftp) {
     console.log('Current TSS_CONFIGS:', Object.keys(TSS_CONFIGS));
 
     // Use the time-based calculation with current settings
-    const tssData = computeNP_by_time(powerData, ftp, getTSSWindowSeconds(), powerExponent);
+    const tssData = computeNP_by_time(powerData, cp, getTSSWindowSeconds(), powerExponent);
 
     // Convert to display format - now dynamically build based on current configs
     const tssResults = {
@@ -375,11 +367,11 @@ function recalculateTSS(powerRecords, ftp) {
     updateTSSDisplayValues(tssResults);
 
     // Recalculate and update TSS accumulation chart
-    const tssAccumulation = calculateTSSAccumulation(powerData, ftp, powerExponent);
+    const tssAccumulation = calculateTSSAccumulation(powerData, cp, powerExponent);
     plotTSSAccumulation(tssAccumulation);
 }
 
-function plotData(hrRecords, powerRecords, ftp) {
+function plotData(hrRecords, powerRecords, cp) {
     // Create combined timeline from all records
     const allRecords = [...hrRecords, ...powerRecords];
     const startTime = allRecords.length > 0 ? allRecords[0].timestamp : null;
@@ -427,7 +419,7 @@ function plotData(hrRecords, powerRecords, ftp) {
         const powerExponent = parseFloat(document.getElementById('powerRaiseInput').value) || CONFIG.DEFAULT_POWER_EXPONENT;
 
         // Use the new correct time-based calculation
-        const tssData = computeNP_by_time(powerData, ftp, getTSSWindowSeconds(), powerExponent);
+        const tssData = computeNP_by_time(powerData, cp, getTSSWindowSeconds(), powerExponent);
 
         // Convert to display format - build dynamically from current configs
         tssResults = {
@@ -446,7 +438,7 @@ function plotData(hrRecords, powerRecords, ftp) {
         });
 
         // Calculate TSS accumulation over time
-        tssAccumulation = calculateTSSAccumulation(powerData, ftp, powerExponent);
+        tssAccumulation = calculateTSSAccumulation(powerData, cp, powerExponent);
     }
 
     // Ensure TSS display is built with current config
@@ -494,10 +486,8 @@ function plotData(hrRecords, powerRecords, ftp) {
             yAxisID: 'y1'
         });
 
-        // Referenslinjen ritas på CP, inte på den härledda FTP: CP är den gräns
-        // som säger något om passet - över den töms W', under den fylls det på.
-        // FTP är bara TSS-nämnaren, och den hör hemma i hjälptexten.
-        const cp = currentCP();
+        // Referenslinjen ritas på CP: gränsen som säger något om passet - över den
+        // töms W', under den fylls det på. Samma CP som TSS normaliseras mot.
         const maxTime = Math.max(...powerData.map(p => p.x));
         datasets.push({
             label: `CP (${cp}W)`,
@@ -1106,7 +1096,7 @@ function resampleTo1Hz(powerData) {
     return resampled;
 }
 
-function computeNP_by_time(rawPowerData, ftp, windowSecondsList = TSS_WINDOW_SECONDS, exponent = CONFIG.DEFAULT_POWER_EXPONENT) {
+function computeNP_by_time(rawPowerData, cp, windowSecondsList = TSS_WINDOW_SECONDS, exponent = CONFIG.DEFAULT_POWER_EXPONENT) {
     if (!rawPowerData || rawPowerData.length < 2) throw new Error("Behöver minst två datapunkter med tidsstämplar.");
 
     // Clean the data first, then put it on a 1 Hz grid
@@ -1170,7 +1160,7 @@ function computeNP_by_time(rawPowerData, ftp, windowSecondsList = TSS_WINDOW_SEC
             const avgPower = totalPower / powerData.length;
 
             npValues[w] = avgPower;
-            const TSS = (duration / 3600) * Math.pow(avgPower / ftp, 2) * 100;
+            const TSS = (duration / 3600) * Math.pow(avgPower / cp, 2) * 100;
             results.windows[w] = {
                 windowsProcessed: 1,
                 NP: Math.round(avgPower * 10) / 10,
@@ -1199,7 +1189,7 @@ function computeNP_by_time(rawPowerData, ftp, windowSecondsList = TSS_WINDOW_SEC
         const NP = Math.pow(meanPow, 1 / exponent);
         npValues[w] = NP;
 
-        const TSS = (duration / 3600) * Math.pow(NP / ftp, 2) * 100;
+        const TSS = (duration / 3600) * Math.pow(NP / cp, 2) * 100;
         results.windows[w] = { windowsProcessed: count, NP: Math.round(NP * 10) / 10, TSS: Math.round(TSS * 10) / 10 };
 
         const minAvg = Math.min(...avgs);
@@ -1229,18 +1219,18 @@ const ACCUMULATION_SLICE = 60; // sekunder per bit
 // En bit kan inte vara kortare än fönstret som ska mätas i den. För fönster som
 // är minst lika långa som biten blir NP över en enda fönsterbredd definitionsmässigt
 // bitens medeleffekt, vilket är precis vad baslinjegrenen (-1) räknar.
-function sliceTSS(slice, windowSeconds, ftp, powerExponent) {
+function sliceTSS(slice, windowSeconds, cp, powerExponent) {
     if (!slice || slice.length < 2) return 0;
 
     const useRolling = windowSeconds > 0 && windowSeconds < ACCUMULATION_SLICE;
     const window = useRolling ? windowSeconds : -1;
-    const result = computeNP_by_time(slice, ftp, [window], powerExponent);
+    const result = computeNP_by_time(slice, cp, [window], powerExponent);
     const data = result.windows[window];
 
     return data && data.TSS ? data.TSS : 0;
 }
 
-function calculateTSSAccumulation(powerData, ftp, powerExponent) {
+function calculateTSSAccumulation(powerData, cp, powerExponent) {
     if (!powerData || powerData.length < 2) return null;
 
     const firstTs = powerData[0].t;
@@ -1267,7 +1257,7 @@ function calculateTSSAccumulation(powerData, ftp, powerExponent) {
             // Summera de bitar som hunnit bli fullständiga
             while (elapsed >= boundary) {
                 const slice = powerData.filter(p => p.t >= sliceStart && p.t < firstTs + boundary);
-                accumulated += sliceTSS(slice, config.seconds, ftp, powerExponent);
+                accumulated += sliceTSS(slice, config.seconds, cp, powerExponent);
                 sliceStart = firstTs + boundary;
                 boundary += sliceSec;
             }
@@ -1416,20 +1406,20 @@ function plotWorkoutPlan(workout) {
 
 function generateWorkoutTimeline(workout) {
     const timeline = [];
-    const ftp = currentFTP();
+    const cp = currentCP();
     let currentTime = 0;
 
     workout.segments.forEach(segment => {
-        currentTime = processSegment(segment, timeline, currentTime, ftp);
+        currentTime = processSegment(segment, timeline, currentTime, cp);
     });
 
     return timeline;
 }
 
-function processSegment(segment, timeline, currentTime, ftp) {
+function processSegment(segment, timeline, currentTime, cp) {
     // Målen räknas om till watt först vid visning
     const step = (target, duration) => {
-        const watt = segmentWatt(target, ftp);
+        const watt = segmentWatt(target, cp);
         timeline.push({ x: currentTime / 60, y: watt });
         currentTime += duration;
         timeline.push({ x: currentTime / 60, y: watt });
@@ -1462,10 +1452,10 @@ function processSegment(segment, timeline, currentTime, ftp) {
 }
 
 function calculateWorkoutTSS(workout) {
-    const ftp = currentFTP();
+    const cp = currentCP();
 
     // Convert workout to power data format (1-second intervals)
-    const powerData = generateWorkoutPowerData(workout, ftp);
+    const powerData = generateWorkoutPowerData(workout, cp);
 
     if (powerData.length === 0) return;
 
@@ -1474,7 +1464,7 @@ function calculateWorkoutTSS(workout) {
     console.log('Calculating workout TSS with', powerData.length, 'data points');
 
     // Calculate TSS using the same function as for real data
-    const tssData = computeNP_by_time(powerData, ftp, getTSSWindowSeconds(), powerExponent);
+    const tssData = computeNP_by_time(powerData, cp, getTSSWindowSeconds(), powerExponent);
 
     // Convert to display format
     const tssResults = {
@@ -1496,21 +1486,21 @@ function calculateWorkoutTSS(workout) {
     displayWorkoutTSS(workout, tssResults);
 }
 
-function generateWorkoutPowerData(workout, ftp) {
+function generateWorkoutPowerData(workout, cp) {
     const powerData = [];
     let currentTime = 0;
 
     workout.segments.forEach(segment => {
-        currentTime = processSegmentPowerData(segment, powerData, currentTime, ftp);
+        currentTime = processSegmentPowerData(segment, powerData, currentTime, cp);
     });
 
     return powerData;
 }
 
-function processSegmentPowerData(segment, powerData, currentTime, ftp) {
-    // Ett steg i passet, i watt vid den FTP som gäller nu
+function processSegmentPowerData(segment, powerData, currentTime, cp) {
+    // Ett steg i passet, i watt vid den CP som gäller nu
     const fill = (target, duration) => {
-        const watt = segmentWatt(target, ftp);
+        const watt = segmentWatt(target, cp);
         for (let t = 0; t < duration; t++) {
             powerData.push({ t: currentTime + t, p: watt });
         }
@@ -1808,8 +1798,8 @@ function createSegmentEditor(segment, index) {
                                onchange="updateWorkoutSegment(${index}, 'duration', parseInt(this.value))">
                     </div>
                     <div class="form-group">
-                        <label>Mål (% av FTP) – ${segmentWatt(segment, currentFTP())} W vid FTP ${currentFTP()}:</label>
-                        <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(segment, currentFTP()) * 100)}"
+                        <label>Mål (% av CP) – ${segmentWatt(segment, currentCP())} W vid CP ${currentCP()}:</label>
+                        <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(segment, currentCP()) * 100)}"
                                onchange="updateWorkoutSegment(${index}, 'targetPercent', parseInt(this.value) / 100)">
                     </div>
                 </div>
@@ -1831,8 +1821,8 @@ function createSegmentEditor(segment, index) {
                                                onchange="updateWorkoutSubSegment(${index}, ${subIndex}, 'duration', parseInt(this.value))">
                                     </div>
                                     <div class="form-group">
-                                        <label>Mål (% av FTP) – ${segmentWatt(subSeg, currentFTP())} W:</label>
-                                        <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(subSeg, currentFTP()) * 100)}"
+                                        <label>Mål (% av CP) – ${segmentWatt(subSeg, currentCP())} W:</label>
+                                        <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(subSeg, currentCP()) * 100)}"
                                                onchange="updateWorkoutSubSegment(${index}, ${subIndex}, 'targetPercent', parseInt(this.value) / 100)">
                                     </div>
                                     <div class="form-group">
@@ -1859,8 +1849,8 @@ function createSegmentEditor(segment, index) {
                                    onchange="updateWorkoutSegmentRest(${index}, 'duration', parseInt(this.value))">
                         </div>
                         <div class="form-group">
-                            <label>Vila (% av FTP):</label>
-                            <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(segment.rest, currentFTP()) * 100)}"
+                            <label>Vila (% av CP):</label>
+                            <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(segment.rest, currentCP()) * 100)}"
                                    onchange="updateWorkoutSegmentRest(${index}, 'targetPercent', parseInt(this.value) / 100)">
                         </div>
                     </div>
@@ -1877,8 +1867,8 @@ function createSegmentEditor(segment, index) {
                            onchange="updateWorkoutSegment(${index}, 'duration', parseInt(this.value))">
                 </div>
                 <div class="form-group">
-                    <label>Mål (% av FTP):</label>
-                    <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(segment, currentFTP()) * 100)}"
+                    <label>Mål (% av CP):</label>
+                    <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(segment, currentCP()) * 100)}"
                            onchange="updateWorkoutSegment(${index}, 'targetPercent', parseInt(this.value) / 100)">
                 </div>
             </div>
@@ -1925,9 +1915,9 @@ function addWorkoutSegment(type) {
     if (type === 'interval') {
         newSegment.repeat = 5; // Default to 5 repetitions
         newSegment.subSegments = [
-            { duration: 60, targetPercent: 2.0 },  // 1min @ 200 % av FTP
-            { duration: 300, targetPercent: 1.0 }, // 5min @ FTP
-            { duration: 120, targetPercent: 1.25 } // 2min @ 125 % av FTP
+            { duration: 60, targetPercent: 2.0 },  // 1min @ 200 % av CP
+            { duration: 300, targetPercent: 1.0 }, // 5min @ CP
+            { duration: 120, targetPercent: 1.25 } // 2min @ 125 % av CP
         ];
         newSegment.rest = {
             duration: 180, // 3 minutes rest
@@ -1994,9 +1984,9 @@ function toggleIntervalType(segmentIndex, type) {
         // Convert to complex interval with sub-segments
         if (!segment.subSegments) {
             segment.subSegments = [
-                { duration: 60, targetPercent: 2.0 },  // 1min @ 200 % av FTP
-                { duration: 300, targetPercent: 1.0 }, // 5min @ FTP
-                { duration: 120, targetPercent: 1.25 } // 2min @ 125 % av FTP
+                { duration: 60, targetPercent: 2.0 },  // 1min @ 200 % av CP
+                { duration: 300, targetPercent: 1.0 }, // 5min @ CP
+                { duration: 120, targetPercent: 1.25 } // 2min @ 125 % av CP
             ];
         }
         // Remove simple interval properties
@@ -2006,7 +1996,7 @@ function toggleIntervalType(segmentIndex, type) {
         // Convert to simple interval
         delete segment.subSegments;
         segment.duration = 240; // 4 minutes default
-        segment.targetPercent = 1.0; // Default: FTP
+        segment.targetPercent = 1.0; // Default: CP
     }
 
     renderWorkoutEditor();

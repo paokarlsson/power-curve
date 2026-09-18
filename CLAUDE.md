@@ -26,12 +26,15 @@ so a value measured in one tool is read by the others. `power-curve/` and `runni
 the sources (they also persist their test inputs, so a reload does not overwrite the
 profile with default values); `wbal/` and `fit-analysis/` read it and write back when
 edited. The profile holds one quantity per field - `cp` in W, `wPrime` in J, `cs` in m/s,
-`dPrime` in m - never FTP, and never display units.
+`dPrime` in m - in model units, never display units.
 
-`fit-analysis/` takes **CP** as input and derives `FTP = 0.95 * CP` internally for TSS and
-IF. The TSS denominator stays FTP on purpose: that is Coggan's definition and what keeps
-`TSS@30s` comparable with Strava and TrainingPeaks. At the same FTP the tool returns
-exactly the same TSS as before the switch. See `docs/03-normalized-power-och-tss.md` §1.
+**CP is the only ceiling power in the repo; FTP appears nowhere.** `fit-analysis/`
+normalizes TSS against CP (`TSS = (t/3600) * (NP/CP)^2 * 100`, so 100 points is an hour at
+CP) and expresses workout targets as a percentage of CP; `wbal/` takes CP and nothing else.
+Coggan's published TSS has FTP in the denominator, and since CP sits above FTP the tool
+returns roughly 10 % lower numbers than Strava or TrainingPeaks for the same ride - the
+numbers are internal, compared against each other rather than outwards. This is a
+deliberate deviation, documented in `docs/03-normalized-power-och-tss.md` §1.
 
 UI text is in Swedish.
 
@@ -126,8 +129,7 @@ one that looks right may be a known fault.
 - Keep each tool self-contained. `athlete-profile.js` is the single deliberate exception:
   it is the shared fitness signature, it touches no DOM, and every tool loads it with a
   plain `<script src="../athlete-profile.js">` before its own code. Nothing else is
-  shared - the CP/FTP rule of thumb, for instance, is stated separately in
-  `wbal/model.js` and `fit-analysis/fit-analysis.js`.
+  shared.
 - Storage is best-effort. Every read and write goes through `athlete-profile.js`, which
   swallows the exceptions private mode throws; each tool must still work with no profile
   at all, falling back to its own defaults.

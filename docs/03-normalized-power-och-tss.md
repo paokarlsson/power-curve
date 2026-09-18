@@ -20,20 +20,33 @@ Coggan & Allens standardkedja för att omvandla en effektfil till en träningsdo
 Verktyget implementerar `TSS = (duration/3600) × (NP/FTP)² × 100`, vilket är algebraiskt
 identiskt med Coggans form. **Korrekt.**
 
-### Inmatningen är CP, nämnaren är FTP
+### Nämnaren är CP, inte FTP  **[Egen – avvikelse från Coggan]**
 
-Verktyget frågar efter **CP**, inte FTP: CP är den storhet som mäts i
-[`power-curve/`](01-critical-power.md) och som delas mellan verktygen genom atletprofilen
-(se [07](07-fel-power-curve.md), sista avsnittet). FTP härleds ur den med samma tumregel
-som `wbal/` använder, `FTP = 0,95 × CP` ([12](12-omskrivning-wbal.md) steg 4).
+Verktyget normaliserar mot **CP**. FTP förekommer inte längre någonstans i repot: CP är den
+enda takeffekt verktygen räknar med, den storhet som mäts i
+[`power-curve/`](01-critical-power.md) och delas genom atletprofilen (se
+[07](07-fel-power-curve.md), sista avsnittet). Implementationen är alltså
 
-Nämnaren i TSS förblir alltså **FTP**, och det är avsiktligt. Coggans definition är
-`IF = NP/FTP`, alltså 100 poäng per timme på FTP - det är den definition Strava,
-TrainingPeaks och WKO räknar med, och som gör `TSS@30s` jämförbar utåt (se
-[10](10-fel-fit-analysis.md), FA-5). Byttes nämnaren mot CP skulle varje TSS-tal i
-verktyget sjunka med ungefär 10 % och sluta betyda samma sak som överallt annars. Vid
-samma FTP ger verktyget exakt samma TSS som före bytet; det är inmatningens storhet som
-har ändrats, inte skalan.
+```
+TSS = (duration/3600) × (NP/CP)² × 100
+```
+
+alltså **100 poäng per timme på CP**, och passmålen anges i procent av samma CP.
+
+**Det här är en medveten avvikelse från den publicerade definitionen.** Coggan har FTP i
+nämnaren, och eftersom CP ligger över FTP - typiskt med faktorn 0,95 - blir varje TSS-tal
+här omkring **10 % lägre** än motsvarande tal i Strava, TrainingPeaks eller WKO. `TSS@30s`
+är därför inte längre direkt jämförbar utåt, vilket [10](10-fel-fit-analysis.md) FA-5 tog
+för givet.
+
+Vad man vinner är att hela repot har **en enda parameter för takeffekten**. Innan dess
+beskrev `power-curve/` atleten med CP, `wbal/` med CP, och `fit-analysis/` med FTP - tre
+verktyg, två storheter, och en omräkning som användaren fick göra i huvudet. Det var precis
+det som gjorde [WB-5](09-fel-wbal.md) lätt att gå på.
+
+Vad man förlorar är den externa jämförbarheten. Talen är interna: de jämförs mot varandra,
+mellan fönsterlängder och mellan pass, inte mot en siffra från en annan plattform. Vill man
+ha ett Coggan-jämförbart tal multiplicerar man med `(CP/FTP)² ≈ 1,11`.
 
 ## 2. Generaliseringen: fönsterlängden som fri parameter  **[Egen – rimlig, och den bästa idén i repot]**
 

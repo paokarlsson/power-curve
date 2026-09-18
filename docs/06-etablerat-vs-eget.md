@@ -32,12 +32,12 @@ när siffrorna jämförs med andra verktyg.
 | Endast slut-W′bal begränsas | **Egen – problematisk** | Ingen kontroll av bottennivån. Pyramiderna underskattar djupet med 3,8–5,4 % av W′; vid τ < 145 s blir pass ogenomförbara utan markering (168 fall). | [WB-1](09-fel-wbal.md) |
 | Vilointensitet per passtyp (30–65 % av CP) | **Etablerad tränarpraxis** | Korrekt kalibrerad och elegant kopplad till återhämtningsmatematiken. | [04](04-wbal-och-intervalldesign.md) §6 |
 | Passtaxonomi anaerob/VO2max/tröskel | **Etablerad** | Standardindelning, rätt durationer. | [04](04-wbal-och-intervalldesign.md) §6 |
-| CP och FTP som utbytbara | **Egen – problematisk** | CP ligger typiskt över FTP. Överskattar W′-förbrukningen. | [04](04-wbal-och-intervalldesign.md) §7 |
+| CP och FTP som utbytbara | **Egen – problematisk, borttagen** | CP låg typiskt över FTP och W′-förbrukningen överskattades. FTP finns inte längre i repot: CP är enda takeffekten. | [04](04-wbal-och-intervalldesign.md) §7 |
 | Rekursivt passchema med `subSegments` | **Egen – rimlig** | Uttrycker samma passfamilj som `wbal/` hårdkodar. | [05](05-passmodellen.md) §1 |
 | **Plan → syntetisk 1 Hz-serie → samma TSS-motor** | **Egen – rimlig, tredje bästa idén** | Gör planerad och genomförd dos direkt jämförbara, per fönster. | [05](05-passmodellen.md) §2 |
 | Absoluta watt i passchemat | **Egen – problematisk** | Mål skalar inte med FTP, men poängsättningen gör det. Exempelpasset "Threshold" ligger på 125 % av FTP. | [05](05-passmodellen.md) §4 |
 | Gemensam atletprofil för alla fyra verktyg | **Egen – rimlig** | En signatur mätt en gång, läst av alla. Tar bort den manuella överföringen som gjorde det lätt att mata in FTP där modellen ville ha CP. | [07](07-fel-power-curve.md), sista avsnittet |
-| `fit-analysis/` matar in CP, härleder FTP för TSS | **Egen – rimlig** | Samma storhet som resten av repot delar, men Coggans nämnare behålls så TSS förblir jämförbar utåt. | [03](03-normalized-power-och-tss.md) §1 |
+| **TSS normaliserad mot CP i stället för FTP** | **Egen – avvikelse från Coggan** | Ger repot en enda takeffekt i alla fyra verktyg, men TSS-talen blir ~10 % lägre än Strava och TrainingPeaks och är därmed interna. | [03](03-normalized-power-och-tss.md) §1 |
 
 ## De tre idéerna värda att behålla och bygga vidare på
 

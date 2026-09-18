@@ -340,6 +340,11 @@ TrainingPeaks, WKO — är den som ser ut att vara något helt annat. Användare
 "sin TSS" och hittar tre rutor med okända fönsterlängder plus en som påstår sig vara
 30-minuters uthållighet.
 
+**Not:** jämförbarheten utåt gäller inte längre. Verktyget normaliserar numera mot CP i
+stället för FTP, vilket ger omkring 10 % lägre tal än Strava och TrainingPeaks — se
+[03](03-normalized-power-och-tss.md) §1. `TSS@30s` är fortfarande referensfönstret, men
+referensen är intern: det är det enda fönstret med en publicerad definition bakom sig.
+
 ### Åtgärd
 
 Rätta etiketten till `30s TSS (Standard)` och markera den som **referensvärdet** — det är

@@ -138,8 +138,13 @@ ett formmått på kurvan, inte en energi.
 - **HIE (= W′)** är förrådet ovanför taket. Det är det som förbrukas i intervaller och som
   hela intervalloptimeraren är byggd kring ([04](04-wbal-och-intervalldesign.md)).
 
-Notera att `wbal/` kallar samma tak för **"CP (Critical Power / FTP)"** och behandlar CP och
+`wbal/` kallade tidigare samma tak för **"CP (Critical Power / FTP)"** och behandlade CP och
 FTP som utbytbara. Det är de inte: FTP definieras protokollmässigt (ofta 95 % av ett
-20-minuterstest), CP definieras matematiskt som asymptoten. CP ligger typiskt något **över**
-FTP. Att mata in ett FTP-värde där modellen vill ha CP gör att W′-förbrukningen
+20-minuterstest), CP definieras matematiskt som asymptoten, och CP ligger typiskt något
+**över** FTP. Att mata in ett FTP-värde där modellen vill ha CP gör att W′-förbrukningen
 systematiskt överskattas — se [04](04-wbal-och-intervalldesign.md) §7.
+
+**Numera finns FTP inte i något av verktygen.** `TP` härifrån är den enda takeffekten: den
+skrivs till den gemensamma atletprofilen som `CP`, och `wbal/` och `fit-analysis/` läser
+den därifrån. Att `fit-analysis/` därmed normaliserar TSS mot CP är en avvikelse från
+Coggans definition, och den är beskriven i [03](03-normalized-power-och-tss.md) §1.
