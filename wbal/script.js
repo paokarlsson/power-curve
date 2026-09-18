@@ -5,13 +5,12 @@
 function calculate() {
     const CP = parseFloat(document.getElementById('cp').value);
     const W_prime = parseFloat(document.getElementById('wprime').value) * 1000;
-    const tau = parseFloat(document.getElementById('tau').value);
     const targetWbalPercent = parseFloat(document.getElementById('targetWbal').value) / 100;
     const targetWbal = W_prime * targetWbalPercent;
 
-    const workouts = calculateAllWorkouts(CP, W_prime, tau, targetWbal);
+    const workouts = calculateAllWorkouts(CP, W_prime, targetWbal);
 
-    displayResults(workouts, CP, W_prime, tau, targetWbalPercent);
+    displayResults(workouts, CP, W_prime, targetWbalPercent);
 }
 
 function formatTime(seconds) {
@@ -34,7 +33,7 @@ function formatDuration(seconds) {
     return `${seconds}s`;
 }
 
-function displayResults(workouts, CP, W_prime, tau, targetWbalPercent) {
+function displayResults(workouts, CP, W_prime, targetWbalPercent) {
     const resultsDiv = document.getElementById('results');
 
     // Summary card
@@ -48,10 +47,6 @@ function displayResults(workouts, CP, W_prime, tau, targetWbalPercent) {
             <div class="result-detail">
                 <span class="result-label">W' (Anaerob Kapacitet):</span>
                 <span class="result-value">${(W_prime / 1000).toFixed(1)} kJ</span>
-            </div>
-            <div class="result-detail">
-                <span class="result-label">τ (Återhämtningskonstant):</span>
-                <span class="result-value">${tau}s</span>
             </div>
             <div class="result-detail">
                 <span class="result-label">Mål W'bal efter pass:</span>
@@ -109,6 +104,11 @@ function displayResults(workouts, CP, W_prime, tau, targetWbalPercent) {
                     <span class="result-value">${formatDuration(template.setRest)} @ ${workout.restPower}W</span>
                 </div>
                 ` : ''}
+
+                <div class="result-detail">
+                    <span class="result-label">τ (härledd ur viloeffekten):</span>
+                    <span class="result-value">${Math.round(workout.tau)}s</span>
+                </div>
 
                 <div class="result-detail">
                     <span class="result-label">Lägsta W'bal i passet:</span>

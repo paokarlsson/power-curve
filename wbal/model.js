@@ -41,16 +41,24 @@ const workoutTemplates = [
     { name: "2×15 min", reps: 2, work: 900, rest: 420, restPercent: 0.65, type: "threshold" }
 ];
 
-// Helper function for W' recovery calculation
-function calculateWPrimeRecovery(W_prime, W_bal, restTime, tau, recoveryFactor) {
-    const W_recovered = (W_prime - W_bal) * (1 - Math.exp(-restTime / tau)) * recoveryFactor;
-    return Math.min(W_bal + W_recovered, W_prime);
+// τ härledd ur vilointensiteten enligt Skiba m.fl. 2012. D_CP är hur långt under
+// CP vilan ligger; ju lägre viloeffekt, desto längre τ och desto trögare
+// återhämtning. Se docs/12-omskrivning-wbal.md steg 1.
+function deriveTau(CP, restPower) {
+    const D_CP = CP - restPower;
+    return 546 * Math.exp(-0.01 * D_CP) + 316;
+}
+
+// Helper function for W' recovery calculation. Exponentialfunktionen går alltid mot
+// W' - vilointensiteten styr hur snabbt, aldrig om (WB-3).
+function calculateWPrimeRecovery(W_prime, W_bal, restTime, tau) {
+    return W_prime - (W_prime - W_bal) * Math.exp(-restTime / tau);
 }
 
 // Simuleringstillstånd. Samlar tömning, återhämtning och minimispårning på ett
 // ställe så att min(W'bal) inte kan glömmas i någon av passtyperna nedan.
-function createSimulation(CP, W_prime, tau, restPower) {
-    const recoveryFactor = (CP - restPower) / CP;
+function createSimulation(CP, W_prime, restPower) {
+    const tau = deriveTau(CP, restPower);
     let W_bal = W_prime;
     let minWbal = W_prime;
 
@@ -62,7 +70,7 @@ function createSimulation(CP, W_prime, tau, restPower) {
             }
         },
         rest: function(duration) {
-            W_bal = calculateWPrimeRecovery(W_prime, W_bal, duration, tau, recoveryFactor);
+            W_bal = calculateWPrimeRecovery(W_prime, W_bal, duration, tau);
         },
         result: function() {
             return { finalWbal: W_bal, minWbal: minWbal };
@@ -72,8 +80,8 @@ function createSimulation(CP, W_prime, tau, restPower) {
 
 // Separate workout simulation functions. Alla returnerar { finalWbal, minWbal }:
 // finalWbal är doseringen, minWbal avgör om passet går att fullfölja (WB-1).
-function simulatePyramidWorkout(template, power, CP, W_prime, tau, restPower) {
-    const sim = createSimulation(CP, W_prime, tau, restPower);
+function simulatePyramidWorkout(template, power, CP, W_prime, restPower) {
+    const sim = createSimulation(CP, W_prime, restPower);
 
     for (let idx = 0; idx < template.pyramid.length; idx++) {
         sim.work(power, template.pyramid[idx]);
@@ -87,8 +95,8 @@ function simulatePyramidWorkout(template, power, CP, W_prime, tau, restPower) {
     return sim.result();
 }
 
-function simulateMixedWorkout(template, power, CP, W_prime, tau, restPower) {
-    const sim = createSimulation(CP, W_prime, tau, restPower);
+function simulateMixedWorkout(template, power, CP, W_prime, restPower) {
+    const sim = createSimulation(CP, W_prime, restPower);
     const pattern = template.mixed[0];
     const miniRest = 30; // 30s between parts
 
@@ -111,8 +119,8 @@ function simulateMixedWorkout(template, power, CP, W_prime, tau, restPower) {
     return sim.result();
 }
 
-function simulateTabataWorkout(template, power, CP, W_prime, tau, restPower) {
-    const sim = createSimulation(CP, W_prime, tau, restPower);
+function simulateTabataWorkout(template, power, CP, W_prime, restPower) {
+    const sim = createSimulation(CP, W_prime, restPower);
 
     for (let set = 0; set < template.sets; set++) {
         for (let rep = 0; rep < template.reps; rep++) {
@@ -133,8 +141,8 @@ function simulateTabataWorkout(template, power, CP, W_prime, tau, restPower) {
     return sim.result();
 }
 
-function simulateStandardWorkout(template, power, CP, W_prime, tau, restPower) {
-    const sim = createSimulation(CP, W_prime, tau, restPower);
+function simulateStandardWorkout(template, power, CP, W_prime, restPower) {
+    const sim = createSimulation(CP, W_prime, restPower);
 
     for (let i = 0; i < template.reps; i++) {
         sim.work(power, template.work);
@@ -148,20 +156,21 @@ function simulateStandardWorkout(template, power, CP, W_prime, tau, restPower) {
     return sim.result();
 }
 
-function simulateWorkout(template, power, CP, W_prime, tau, restPower) {
+function simulateWorkout(template, power, CP, W_prime, restPower) {
     if (template.pyramid) {
-        return simulatePyramidWorkout(template, power, CP, W_prime, tau, restPower);
+        return simulatePyramidWorkout(template, power, CP, W_prime, restPower);
     } else if (template.mixed) {
-        return simulateMixedWorkout(template, power, CP, W_prime, tau, restPower);
+        return simulateMixedWorkout(template, power, CP, W_prime, restPower);
     } else if (template.sets) {
-        return simulateTabataWorkout(template, power, CP, W_prime, tau, restPower);
+        return simulateTabataWorkout(template, power, CP, W_prime, restPower);
     } else {
-        return simulateStandardWorkout(template, power, CP, W_prime, tau, restPower);
+        return simulateStandardWorkout(template, power, CP, W_prime, restPower);
     }
 }
 
-function calculateWorkout(template, CP, W_prime, tau, targetWbal) {
+function calculateWorkout(template, CP, W_prime, targetWbal) {
     const restPower = CP * template.restPercent;
+    const tau = deriveTau(CP, restPower);
 
     // Binary search for optimal power
     let minPower = CP * 1.05;
@@ -169,7 +178,7 @@ function calculateWorkout(template, CP, W_prime, tau, targetWbal) {
     let optimalPower = (minPower + maxPower) / 2;
 
     for (let i = 0; i < 30; i++) {
-        const finalWbal = simulateWorkout(template, optimalPower, CP, W_prime, tau, restPower).finalWbal;
+        const finalWbal = simulateWorkout(template, optimalPower, CP, W_prime, restPower).finalWbal;
 
         if (Math.abs(finalWbal - targetWbal) < 100) {
             break;
@@ -189,7 +198,7 @@ function calculateWorkout(template, CP, W_prime, tau, targetWbal) {
 
     // Utfallet mäts på den oavrundade effekten - det är den siffran
     // docs/12-omskrivning-wbal.md tabellerar.
-    const outcome = simulateWorkout(template, optimalPower, CP, W_prime, tau, restPower);
+    const outcome = simulateWorkout(template, optimalPower, CP, W_prime, restPower);
 
     return {
         name: template.name,
@@ -197,6 +206,7 @@ function calculateWorkout(template, CP, W_prime, tau, targetWbal) {
         power: Math.round(optimalPower),
         percentage: Math.round(optimalPower / CP * 100),
         restPower: Math.round(restPower),
+        tau: tau,
         finalWbal: outcome.finalWbal,
         minWbal: outcome.minWbal,
         template: template,
@@ -237,11 +247,11 @@ function calculateWorkoutStats(template) {
 }
 
 // Räkna ut alla mallar för en fitness signature. Enda ingången modellen behöver utåt.
-function calculateAllWorkouts(CP, W_prime, tau, targetWbal) {
+function calculateAllWorkouts(CP, W_prime, targetWbal) {
     const workouts = [];
 
     workoutTemplates.forEach(template => {
-        const workout = calculateWorkout(template, CP, W_prime, tau, targetWbal);
+        const workout = calculateWorkout(template, CP, W_prime, targetWbal);
         if (workout) {
             workouts.push(workout);
         }
@@ -255,6 +265,7 @@ function calculateAllWorkouts(CP, W_prime, tau, targetWbal) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         workoutTemplates,
+        deriveTau,
         calculateWPrimeRecovery,
         simulateWorkout,
         calculateWorkout,
