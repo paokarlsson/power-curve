@@ -82,6 +82,32 @@ function createDefaultTSSConfigs() {
 // Dynamic TSS configurations - can be modified at runtime
 let TSS_CONFIGS = createDefaultTSSConfigs();
 
+// Passmålen anges relativt FTP (FA-6). TSS är per definition redan normaliserad
+// mot FTP, så ett pass som beskrivs relativt får en planerad TSS som är identisk
+// för alla atleter - vilket är precis vad man vill när pass delas eller
+// återanvänds. Absoluta watt knöt passet till en atlet vid en tidpunkt:
+// exempelpasset "4x4 Threshold" föreskrev 250 W, alltså 125 % av standard-FTP
+// 200 W, vilket är VO2max-intensitet och inte tröskel.
+//
+// targetPercent: 0 är tillåtet så att äkta vila går att uttrycka. Det förutsätter
+// att 30 W-golvet är borta (7.2), annars räknas vilan ändå som 30 W och ändringen
+// ser ut att fungera utan att göra någon skillnad.
+function segmentPercent(target, ftp) {
+    if (!target) return 0;
+    if (typeof target.targetPercent === 'number') return target.targetPercent;
+    // Äldre passfiler med absoluta watt läses fortfarande
+    if (typeof target.targetWatt === 'number') return ftp > 0 ? target.targetWatt / ftp : 0;
+    return 0;
+}
+
+function segmentWatt(target, ftp) {
+    return Math.round(segmentPercent(target, ftp) * ftp);
+}
+
+function currentFTP() {
+    return parseInt(document.getElementById('ftpInput').value) || CONFIG.DEFAULT_FTP;
+}
+
 // Function to get current TSS window seconds array
 function getTSSWindowSeconds() {
     return Object.values(TSS_CONFIGS).map(config => config.seconds);
@@ -1167,57 +1193,59 @@ function plotWorkoutPlan(workout) {
 
 function generateWorkoutTimeline(workout) {
     const timeline = [];
+    const ftp = currentFTP();
     let currentTime = 0;
 
     workout.segments.forEach(segment => {
-        currentTime = processSegment(segment, timeline, currentTime);
+        currentTime = processSegment(segment, timeline, currentTime, ftp);
     });
 
     return timeline;
 }
 
-function processSegment(segment, timeline, currentTime) {
+function processSegment(segment, timeline, currentTime, ftp) {
+    // Målen räknas om till watt först vid visning
+    const step = (target, duration) => {
+        const watt = segmentWatt(target, ftp);
+        timeline.push({ x: currentTime / 60, y: watt });
+        currentTime += duration;
+        timeline.push({ x: currentTime / 60, y: watt });
+    };
+
     if (segment.type === 'interval' && segment.repeat) {
         // Handle repeated intervals
         for (let i = 0; i < segment.repeat; i++) {
             if (segment.subSegments && segment.subSegments.length > 0) {
                 // Recursive intervals with sub-segments
                 segment.subSegments.forEach(subSegment => {
-                    timeline.push({ x: currentTime / 60, y: subSegment.targetWatt });
-                    currentTime += subSegment.duration;
-                    timeline.push({ x: currentTime / 60, y: subSegment.targetWatt });
+                    step(subSegment, subSegment.duration);
                 });
             } else {
                 // Simple interval
-                timeline.push({ x: currentTime / 60, y: segment.targetWatt });
-                currentTime += segment.duration;
-                timeline.push({ x: currentTime / 60, y: segment.targetWatt });
+                step(segment, segment.duration);
             }
 
             // Rest period (except after last interval)
             if (i < segment.repeat - 1 && segment.rest) {
-                timeline.push({ x: currentTime / 60, y: segment.rest.targetWatt });
-                currentTime += segment.rest.duration;
-                timeline.push({ x: currentTime / 60, y: segment.rest.targetWatt });
+                step(segment.rest, segment.rest.duration);
             }
         }
     } else {
         // Simple segment (warmup, cooldown, etc.)
-        timeline.push({ x: currentTime / 60, y: segment.targetWatt });
-        currentTime += segment.duration;
-        timeline.push({ x: currentTime / 60, y: segment.targetWatt });
+        step(segment, segment.duration);
     }
 
     return currentTime;
 }
 
 function calculateWorkoutTSS(workout) {
+    const ftp = currentFTP();
+
     // Convert workout to power data format (1-second intervals)
-    const powerData = generateWorkoutPowerData(workout);
+    const powerData = generateWorkoutPowerData(workout, ftp);
 
     if (powerData.length === 0) return;
 
-    const ftp = parseInt(document.getElementById('ftpInput').value) || CONFIG.DEFAULT_FTP;
     const powerExponent = parseFloat(document.getElementById('powerRaiseInput').value) || CONFIG.DEFAULT_POWER_EXPONENT;
 
     console.log('Calculating workout TSS with', powerData.length, 'data points');
@@ -1244,63 +1272,48 @@ function calculateWorkoutTSS(workout) {
     displayWorkoutTSS(workout, tssResults);
 }
 
-function generateWorkoutPowerData(workout) {
+function generateWorkoutPowerData(workout, ftp) {
     const powerData = [];
     let currentTime = 0;
 
     workout.segments.forEach(segment => {
-        currentTime = processSegmentPowerData(segment, powerData, currentTime);
+        currentTime = processSegmentPowerData(segment, powerData, currentTime, ftp);
     });
 
     return powerData;
 }
 
-function processSegmentPowerData(segment, powerData, currentTime) {
+function processSegmentPowerData(segment, powerData, currentTime, ftp) {
+    // Ett steg i passet, i watt vid den FTP som gäller nu
+    const fill = (target, duration) => {
+        const watt = segmentWatt(target, ftp);
+        for (let t = 0; t < duration; t++) {
+            powerData.push({ t: currentTime + t, p: watt });
+        }
+        currentTime += duration;
+    };
+
     if (segment.type === 'interval' && segment.repeat) {
         // Handle repeated intervals
         for (let i = 0; i < segment.repeat; i++) {
             if (segment.subSegments && segment.subSegments.length > 0) {
                 // Recursive intervals with sub-segments
                 segment.subSegments.forEach(subSegment => {
-                    for (let t = 0; t < subSegment.duration; t++) {
-                        powerData.push({
-                            t: currentTime + t,
-                            p: subSegment.targetWatt
-                        });
-                    }
-                    currentTime += subSegment.duration;
+                    fill(subSegment, subSegment.duration);
                 });
             } else {
                 // Simple interval - add 1-second data points
-                for (let t = 0; t < segment.duration; t++) {
-                    powerData.push({
-                        t: currentTime + t,
-                        p: segment.targetWatt
-                    });
-                }
-                currentTime += segment.duration;
+                fill(segment, segment.duration);
             }
 
             // Rest period (except after last interval)
             if (i < segment.repeat - 1 && segment.rest) {
-                for (let t = 0; t < segment.rest.duration; t++) {
-                    powerData.push({
-                        t: currentTime + t,
-                        p: segment.rest.targetWatt
-                    });
-                }
-                currentTime += segment.rest.duration;
+                fill(segment.rest, segment.rest.duration);
             }
         }
     } else {
         // Simple segment - add 1-second data points
-        for (let t = 0; t < segment.duration; t++) {
-            powerData.push({
-                t: currentTime + t,
-                p: segment.targetWatt
-            });
-        }
-        currentTime += segment.duration;
+        fill(segment, segment.duration);
     }
 
     return currentTime;
@@ -1571,9 +1584,9 @@ function createSegmentEditor(segment, index) {
                                onchange="updateWorkoutSegment(${index}, 'duration', parseInt(this.value))">
                     </div>
                     <div class="form-group">
-                        <label>Target Power (watts):</label>
-                        <input type="number" min="50" max="1000" value="${segment.targetWatt || 250}"
-                               onchange="updateWorkoutSegment(${index}, 'targetWatt', parseInt(this.value))">
+                        <label>Mål (% av FTP) – ${segmentWatt(segment, currentFTP())} W vid FTP ${currentFTP()}:</label>
+                        <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(segment, currentFTP()) * 100)}"
+                               onchange="updateWorkoutSegment(${index}, 'targetPercent', parseInt(this.value) / 100)">
                     </div>
                 </div>
             `;
@@ -1594,9 +1607,9 @@ function createSegmentEditor(segment, index) {
                                                onchange="updateWorkoutSubSegment(${index}, ${subIndex}, 'duration', parseInt(this.value))">
                                     </div>
                                     <div class="form-group">
-                                        <label>Power (watts):</label>
-                                        <input type="number" min="50" max="1000" value="${subSeg.targetWatt}"
-                                               onchange="updateWorkoutSubSegment(${index}, ${subIndex}, 'targetWatt', parseInt(this.value))">
+                                        <label>Mål (% av FTP) – ${segmentWatt(subSeg, currentFTP())} W:</label>
+                                        <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(subSeg, currentFTP()) * 100)}"
+                                               onchange="updateWorkoutSubSegment(${index}, ${subIndex}, 'targetPercent', parseInt(this.value) / 100)">
                                     </div>
                                     <div class="form-group">
                                         <button class="remove-btn" onclick="removeSubSegment(${index}, ${subIndex})">Remove</button>
@@ -1622,9 +1635,9 @@ function createSegmentEditor(segment, index) {
                                    onchange="updateWorkoutSegmentRest(${index}, 'duration', parseInt(this.value))">
                         </div>
                         <div class="form-group">
-                            <label>Rest Power (watts):</label>
-                            <input type="number" min="50" max="500" value="${segment.rest.targetWatt}"
-                                   onchange="updateWorkoutSegmentRest(${index}, 'targetWatt', parseInt(this.value))">
+                            <label>Vila (% av FTP):</label>
+                            <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(segment.rest, currentFTP()) * 100)}"
+                                   onchange="updateWorkoutSegmentRest(${index}, 'targetPercent', parseInt(this.value) / 100)">
                         </div>
                     </div>
                 </div>
@@ -1640,9 +1653,9 @@ function createSegmentEditor(segment, index) {
                            onchange="updateWorkoutSegment(${index}, 'duration', parseInt(this.value))">
                 </div>
                 <div class="form-group">
-                    <label>Target Power (watts):</label>
-                    <input type="number" min="50" max="1000" value="${segment.targetWatt}"
-                           onchange="updateWorkoutSegment(${index}, 'targetWatt', parseInt(this.value))">
+                    <label>Mål (% av FTP):</label>
+                    <input type="number" min="0" max="300" step="1" value="${Math.round(segmentPercent(segment, currentFTP()) * 100)}"
+                           onchange="updateWorkoutSegment(${index}, 'targetPercent', parseInt(this.value) / 100)">
                 </div>
             </div>
         `;
@@ -1682,23 +1695,23 @@ function addWorkoutSegment(type) {
     const newSegment = {
         type: type,
         duration: 300, // 5 minutes default
-        targetWatt: 150
+        targetPercent: 0.75
     };
 
     if (type === 'interval') {
         newSegment.repeat = 5; // Default to 5 repetitions
         newSegment.subSegments = [
-            { duration: 60, targetWatt: 400 },  // 1min @ 400w
-            { duration: 300, targetWatt: 200 }, // 5min @ 200w
-            { duration: 120, targetWatt: 250 }  // 2min @ 250w
+            { duration: 60, targetPercent: 2.0 },  // 1min @ 200 % av FTP
+            { duration: 300, targetPercent: 1.0 }, // 5min @ FTP
+            { duration: 120, targetPercent: 1.25 } // 2min @ 125 % av FTP
         ];
         newSegment.rest = {
             duration: 180, // 3 minutes rest
-            targetWatt: 100
+            targetPercent: 0.5
         };
         // Remove simple interval properties since we're using sub-segments
         delete newSegment.duration;
-        delete newSegment.targetWatt;
+        delete newSegment.targetPercent;
     }
 
     currentWorkout.segments.push(newSegment);
@@ -1716,22 +1729,22 @@ function resetWorkoutToDefault() {
             {
                 "type": "warmup",
                 "duration": 600,
-                "targetWatt": 150
+                "targetPercent": 0.75
             },
             {
                 "type": "interval",
                 "duration": 240,
-                "targetWatt": 250,
+                "targetPercent": 0.95,
                 "repeat": 4,
                 "rest": {
                     "duration": 120,
-                    "targetWatt": 100
+                    "targetPercent": 0.5
                 }
             },
             {
                 "type": "cooldown",
                 "duration": 300,
-                "targetWatt": 120
+                "targetPercent": 0.6
             }
         ]
     };
@@ -1757,19 +1770,19 @@ function toggleIntervalType(segmentIndex, type) {
         // Convert to complex interval with sub-segments
         if (!segment.subSegments) {
             segment.subSegments = [
-                { duration: 60, targetWatt: 400 },  // 1min @ 400w
-                { duration: 300, targetWatt: 200 }, // 5min @ 200w
-                { duration: 120, targetWatt: 250 }  // 2min @ 250w
+                { duration: 60, targetPercent: 2.0 },  // 1min @ 200 % av FTP
+                { duration: 300, targetPercent: 1.0 }, // 5min @ FTP
+                { duration: 120, targetPercent: 1.25 } // 2min @ 125 % av FTP
             ];
         }
         // Remove simple interval properties
         delete segment.duration;
-        delete segment.targetWatt;
+        delete segment.targetPercent;
     } else {
         // Convert to simple interval
         delete segment.subSegments;
         segment.duration = 240; // 4 minutes default
-        segment.targetWatt = 250; // Default power
+        segment.targetPercent = 1.0; // Default: FTP
     }
 
     renderWorkoutEditor();
@@ -1795,7 +1808,7 @@ function addSubSegment(segmentIndex) {
 
         currentWorkout.segments[segmentIndex].subSegments.push({
             duration: 60,
-            targetWatt: 200
+            targetPercent: 1.0
         });
 
         renderWorkoutEditor();
@@ -1904,27 +1917,34 @@ function validateWorkoutStructure(workout) {
             if (segment.subSegments && Array.isArray(segment.subSegments)) {
                 for (const subSeg of segment.subSegments) {
                     if (typeof subSeg.duration !== 'number' || subSeg.duration < 1) return false;
-                    if (typeof subSeg.targetWatt !== 'number' || subSeg.targetWatt < 1) return false;
+                    if (!hasValidTarget(subSeg)) return false;
                 }
             } else {
                 // Simple interval validation
                 if (typeof segment.duration !== 'number' || segment.duration < 1) return false;
-                if (typeof segment.targetWatt !== 'number' || segment.targetWatt < 1) return false;
+                if (!hasValidTarget(segment)) return false;
             }
 
             // Check rest period if present
             if (segment.rest) {
                 if (typeof segment.rest.duration !== 'number' || segment.rest.duration < 1) return false;
-                if (typeof segment.rest.targetWatt !== 'number' || segment.rest.targetWatt < 1) return false;
+                if (!hasValidTarget(segment.rest)) return false;
             }
         } else {
             // Simple segment validation (warmup, cooldown)
             if (typeof segment.duration !== 'number' || segment.duration < 1) return false;
-            if (typeof segment.targetWatt !== 'number' || segment.targetWatt < 1) return false;
+            if (!hasValidTarget(segment)) return false;
         }
     }
 
     return true;
+}
+
+// targetPercent: 0 är giltigt - det är så äkta vila uttrycks (FA-6). Äldre filer
+// med absoluta watt accepteras fortfarande, med det gamla kravet targetWatt >= 1.
+function hasValidTarget(target) {
+    if (typeof target.targetPercent === 'number') return target.targetPercent >= 0;
+    return typeof target.targetWatt === 'number' && target.targetWatt >= 1;
 }
 
 function generateWorkoutId() {
