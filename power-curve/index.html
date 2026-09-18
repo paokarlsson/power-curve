@@ -60,10 +60,12 @@
                 <div class="text-sm text-orange-200 mb-1">HIE (High Intensity Energy)</div>
                 <div id="hieValue" class="text-2xl lg:text-3xl font-bold">–</div>
                 <div id="hieJoule" class="text-xs text-orange-200 mt-1">–</div>
+                <div id="hieSpan" class="text-xs text-orange-200 mt-1">–</div>
             </div>
             <div class="bg-gradient-to-br from-green-600 to-green-700 p-4 rounded-lg text-center">
                 <div class="text-sm text-green-200 mb-1">TP (Threshold Power)</div>
                 <div id="tpValue" class="text-2xl lg:text-3xl font-bold">–</div>
+                <div id="tpSpan" class="text-xs text-green-200 mt-1">–</div>
             </div>
             <div class="bg-gradient-to-br from-purple-600 to-purple-700 p-4 rounded-lg text-center">
                 <div class="text-sm text-purple-200 mb-1">Maximalt arbete på 1 h</div>
@@ -99,6 +101,9 @@
             <p class="mt-2">• <span class="text-green-400">TP</span> = Lutningen på den linjära kurvan: <span id="tpInline">–</span></p>
             <p>• <span class="text-orange-400">HIE</span> = Y-intercept på den linjära kurvan: <span id="hieInline">–</span></p>
             <p>• <span class="text-purple-400">Maximalt arbete på 1 h</span> = W(3600) = TP × 3600 + HIE: <span id="maxWorkInline">–</span></p>
+            <p class="mt-2">• <span class="text-yellow-400">Känslighet:</span> två punkter ger exakt en lösning, alltså
+                ingen residual och ingen konfidens. Spannen ovan visar hur mycket <span id="errorHint">–</span> mätfel på
+                testpunkterna flyttar skattningen - den tredje värdesiffran är fiktion.</p>
             <p class="mt-3 text-white"><strong>🧪 Testprotokoll:</strong> använd <strong>två maximala insatser mellan 3 och 12 minuter</strong>,
                 med <strong>minst 3 minuters skillnad</strong> i längd. Verktygets defaultvärden, 210 s och 630 s, ligger mitt i
                 modellens giltiga domän. Kortare insatser än ~2 minuter domineras av neuromuskulär effekt som modellen inte
@@ -108,10 +113,42 @@
 
     <script>
         let powerChart, workChart;
-        let currentData = { tp: 0, hie: 0, maxTestPower: 0, maxWork1h: 0 };
+        let currentData = { tp: 0, hie: 0, maxTestPower: 0, maxWork1h: 0, tpSpan: 0, hieSpan: 0 };
+
+        // Två punkter ger exakt en lösning, alltid: ingen residual, ingen
+        // konfidensskattning, ingen möjlighet att upptäcka att en insats var dålig
+        // (PC-5). Gränsen går inte att räkna bort, bara synliggöra.
+        const MEASUREMENT_ERROR = 5;   // W, typiskt mätfel på en testpunkt
+        const MIN_SEPARATION = 180;    // s, under detta är skattningen opålitlig
 
         function formatTime(seconds) {
             return `${Math.round(seconds)}s`;
+        }
+
+        function signatureFrom(P1, t1, P2, t2) {
+            const tp = (P1 * t1 - P2 * t2) / (t1 - t2);
+            return { tp: tp, hie: (P1 - tp) * t1 };
+        }
+
+        // TP är lutningen mellan två punkter i arbete–tid-planet, så en liten
+        // vertikal störning svänger lutningen - desto mer ju närmare punkterna
+        // ligger på tidsaxeln. Samma geometri som gör ett långt sikte mer precist
+        // än ett kort. Här prövas ±5 W på båda punkterna.
+        function sensitivity(P1, t1, P2, t2) {
+            let tpMin = Infinity, tpMax = -Infinity;
+            let hieMin = Infinity, hieMax = -Infinity;
+
+            [-MEASUREMENT_ERROR, MEASUREMENT_ERROR].forEach(e1 => {
+                [-MEASUREMENT_ERROR, MEASUREMENT_ERROR].forEach(e2 => {
+                    const signature = signatureFrom(P1 + e1, t1, P2 + e2, t2);
+                    tpMin = Math.min(tpMin, signature.tp);
+                    tpMax = Math.max(tpMax, signature.tp);
+                    hieMin = Math.min(hieMin, signature.hie);
+                    hieMax = Math.max(hieMax, signature.hie);
+                });
+            });
+
+            return { tp: (tpMax - tpMin) / 2, hie: (hieMax - hieMin) / 2 };
         }
 
         function showMessage(html) {
@@ -129,7 +166,7 @@
         // Inga siffror alls hellre än siffror som inte hör ihop med inmatningen.
         function blankSignature() {
             const ids = ['maxTestPowerValue', 'hieValue', 'hieJoule', 'tpValue', 'maxWorkValue',
-                'maxWorkAvg', 'tpInline', 'hieInline', 'maxWorkInline'];
+                'maxWorkAvg', 'tpSpan', 'hieSpan', 'tpInline', 'hieInline', 'maxWorkInline'];
             ids.forEach(id => {
                 document.getElementById(id).textContent = '–';
             });
@@ -164,8 +201,9 @@
 
             clearMessage();
 
-            const CP = (P1 * t1 - P2 * t2) / (t1 - t2);
-            const Wprime = (P1 - CP) * t1;
+            const signature = signatureFrom(P1, t1, P2, t2);
+            const CP = signature.tp;
+            const Wprime = signature.hie;
 
             // Negativ HIE är modellens enda inbyggda kvalitetskontroll (PC-4): den
             // korta insatsen gav mindre totalt arbete än den långa, vilket är
@@ -185,6 +223,18 @@
             // Rutan visar bara den högre av de två inmatade effekterna (PC-2).
             const maxTestPower = Math.max(P1, P2);
 
+            // Känsligheten först, den behövs både i rutorna och i varningen
+            const span = sensitivity(P1, t1, P2, t2);
+            const separation = Math.abs(t1 - t2);
+
+            if (separation < MIN_SEPARATION) {
+                showMessage(`<strong>Testtiderna ligger bara ${Math.round(separation)} s ifrån varandra.</strong>
+                    TP är lutningen mellan två punkter i arbete–tid-planet, så ju närmare punkterna ligger på
+                    tidsaxeln desto mer svänger skattningen av ett litet mätfel: här flyttar
+                    ${MEASUREMENT_ERROR} W fel TP ±${Math.round(span.tp)} W och HIE
+                    ±${(span.hie / 1000).toFixed(1)} kJ. Använd två insatser med minst tre minuters skillnad i längd.`);
+            }
+
             // Modellen är formulerad i arbete: W(t) = TP · t + HIE. Frågan "hur mycket
             // orkar jag på en timme" besvaras genom att sätta t = 3600, inte genom att
             // integrera effektkurvan (PC-1). Integralen summerade insatser som utesluter
@@ -195,7 +245,9 @@
                 tp: Math.round(CP),
                 hie: Math.round(Wprime),
                 maxTestPower: Math.round(maxTestPower),
-                maxWork1h: maxWork1h
+                maxWork1h: maxWork1h,
+                tpSpan: span.tp,
+                hieSpan: span.hie
             };
 
             updateDisplayValues();
@@ -210,9 +262,15 @@
             document.getElementById('maxWorkValue').textContent = `${(currentData.maxWork1h / 1000).toFixed(0)}kJ`;
             document.getElementById('maxWorkAvg').textContent = `≈ ${Math.round(currentData.maxWork1h / 3600)}W snitt`;
 
+            document.getElementById('errorHint').textContent = `${MEASUREMENT_ERROR} W`;
+            document.getElementById('tpSpan').textContent =
+                `±${Math.round(currentData.tpSpan)}W vid ${MEASUREMENT_ERROR}W mätfel`;
+            document.getElementById('hieSpan').textContent =
+                `±${(currentData.hieSpan / 1000).toFixed(1)}kJ vid ${MEASUREMENT_ERROR}W mätfel`;
+
             // Samma tal i förklaringen som i rutorna - inget hårdkodat exempel (PC-6).
-            document.getElementById('tpInline').textContent = `${currentData.tp}W`;
-            document.getElementById('hieInline').textContent = `${(currentData.hie / 1000).toFixed(1)}kJ (${currentData.hie}J)`;
+            document.getElementById('tpInline').textContent = `${currentData.tp}W (±${Math.round(currentData.tpSpan)}W)`;
+            document.getElementById('hieInline').textContent = `${(currentData.hie / 1000).toFixed(1)}kJ (±${(currentData.hieSpan / 1000).toFixed(1)}kJ)`;
             document.getElementById('maxWorkInline').textContent = `${(currentData.maxWork1h / 1000).toFixed(0)}kJ`;
 
             updatePointInfo();
