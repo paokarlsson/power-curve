@@ -187,6 +187,29 @@
             margin-top: 5px;
         }
 
+        .prediction-item.outside-domain {
+            background: #141414;
+            border: 1px dashed #4B5563;
+        }
+
+        .prediction-item.outside-domain .prediction-distance {
+            color: #9CA3AF;
+        }
+
+        .prediction-mark {
+            font-size: 0.7rem;
+            line-height: 1.3;
+            color: #FBBF24;
+            margin-top: 8px;
+        }
+
+        .prediction-legend {
+            margin-top: 18px;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            color: #9CA3AF;
+        }
+
         .chart-card {
             background: #2a2a2a;
             padding: 25px;
@@ -298,6 +321,12 @@
                     <div class="prediction-distance">Laddar...</div>
                 </div>
             </div>
+            <p class="prediction-legend" id="predictionLegend">
+                CS-modellen är validerad för insatser på ungefär <strong>2–15 minuter</strong>.
+                Prediktioner inom den domänen visas som vanligt; de som ligger utanför är
+                <span style="color: #9CA3AF">streckade och gråmarkerade</span> och ska läsas med
+                markeringen på kortet. Talen är desamma - det är tilliten till dem som skiljer.
+            </p>
         </div>
 
         <!-- Charts Section -->
@@ -411,14 +440,17 @@
         }
 
         function generatePredictions(CS, Dprime) {
+            // Läsregeln ur docs/02-critical-speed.md §3: lita på 3 km-10 km, läs
+            // 800 m/1500 m som "minst så snabbt" och halvmara/mara som "aldrig
+            // snabbare än så här". Domänen är modellens, ~2-15 min.
             const distances = [
-                { name: '800m', meters: 800 },
-                { name: '1500m', meters: 1500 },
-                { name: '3K', meters: 3000 },
-                { name: '5K', meters: 5000 },
-                { name: '10K', meters: 10000 },
-                { name: 'Halvmara', meters: 21097.5 },
-                { name: 'Mara', meters: 42195 }
+                { name: '800m', meters: 800, domain: 'short' },
+                { name: '1500m', meters: 1500, domain: 'short' },
+                { name: '3K', meters: 3000, domain: 'trusted' },
+                { name: '5K', meters: 5000, domain: 'trusted' },
+                { name: '10K', meters: 10000, domain: 'trusted' },
+                { name: 'Halvmara', meters: 21097.5, domain: 'long' },
+                { name: 'Mara', meters: 42195, domain: 'long' }
             ];
 
             const grid = document.getElementById('predictionGrid');
@@ -432,11 +464,14 @@
                     const pace = formatPace(dist.meters / time);
                     
                     const item = document.createElement('div');
-                    item.className = 'prediction-item';
+                    item.className = dist.domain === 'trusted'
+                        ? 'prediction-item'
+                        : 'prediction-item outside-domain';
                     item.innerHTML = `
                         <div class="prediction-distance">${dist.name}</div>
                         <div class="prediction-time">${formatRaceTime(time)}</div>
                         <div class="prediction-pace">${pace}</div>
+                        ${dist.domain === 'trusted' ? '' : '<div class="prediction-mark">utanför modellens giltighet</div>'}
                     `;
                     grid.appendChild(item);
                 }
