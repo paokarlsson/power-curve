@@ -55,6 +55,18 @@ const DEFAULT_TSS_CONFIGS = {
         label: 'TSS@600s',
         chartColor: '#1976d2',
         chartBackground: '#e3f2fd'
+    },
+    // NP med ett oändligt långt fönster är medeleffekten, så baslinjen är
+    // spektrumets nedre asymptot - den nivå alla fönstervärden konvergerar mot.
+    // Sentinelvärdet -1 aktiverar den färdiga grenen i computeNP_by_time (FA-8).
+    BASE: {
+        seconds: -1,
+        displayKey: 'base',
+        elementId: 'tssBase',
+        label: 'Base TSS (medeleffekt)',
+        chartColor: '#546e7a',
+        chartBackground: '#eceff1',
+        fixed: true // Cannot be edited or removed
     }
 };
 
