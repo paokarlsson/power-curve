@@ -65,9 +65,9 @@
                 <div id="tpValue" class="text-2xl lg:text-3xl font-bold">270W</div>
             </div>
             <div class="bg-gradient-to-br from-purple-600 to-purple-700 p-4 rounded-lg text-center">
-                <div class="text-sm text-purple-200 mb-1">Area (0-1h)</div>
-                <div id="areaValue" class="text-2xl lg:text-3xl font-bold">982kJ</div>
-                <div id="areaAvg" class="text-xs text-purple-200 mt-1">≈ 273W avg</div>
+                <div class="text-sm text-purple-200 mb-1">Maximalt arbete på 1 h</div>
+                <div id="maxWorkValue" class="text-2xl lg:text-3xl font-bold">982kJ</div>
+                <div id="maxWorkAvg" class="text-xs text-purple-200 mt-1">≈ 273W snitt</div>
             </div>
         </div>
 
@@ -103,7 +103,7 @@
 
     <script>
         let powerChart, workChart;
-        let currentData = { tp: 0, hie: 0, pp: 0, area: 0 };
+        let currentData = { tp: 0, hie: 0, pp: 0, maxWork1h: 0 };
 
         function formatTime(seconds) {
             return `${Math.round(seconds)}s`;
@@ -123,7 +123,7 @@
 
         // Inga siffror alls hellre än siffror som inte hör ihop med inmatningen.
         function blankSignature() {
-            const ids = ['ppValue', 'hieValue', 'hieJoule', 'tpValue', 'areaValue', 'areaAvg'];
+            const ids = ['ppValue', 'hieValue', 'hieJoule', 'tpValue', 'maxWorkValue', 'maxWorkAvg'];
             ids.forEach(id => {
                 document.getElementById(id).textContent = '–';
             });
@@ -176,15 +176,17 @@
 
             const PP = Math.max(P1, P2);
 
-            const T = 3600;
-            const t0 = 1;
-            const area = CP * (T - t0) + Wprime * Math.log(T / t0);
+            // Modellen är formulerad i arbete: W(t) = TP · t + HIE. Frågan "hur mycket
+            // orkar jag på en timme" besvaras genom att sätta t = 3600, inte genom att
+            // integrera effektkurvan (PC-1). Integralen summerade insatser som utesluter
+            // varandra och berodde dessutom på en godtycklig undre gräns t₀.
+            const maxWork1h = CP * 3600 + Wprime;
 
             currentData = {
                 tp: Math.round(CP),
                 hie: Math.round(Wprime),
                 pp: Math.round(PP),
-                area: area
+                maxWork1h: maxWork1h
             };
 
             updateDisplayValues();
@@ -196,8 +198,8 @@
             document.getElementById('hieValue').textContent = `${(currentData.hie / 1000).toFixed(1)}kJ`;
             document.getElementById('hieJoule').textContent = `${currentData.hie.toFixed(0)} joule`;
             document.getElementById('tpValue').textContent = `${currentData.tp}W`;
-            document.getElementById('areaValue').textContent = `${(currentData.area / 1000).toFixed(0)}kJ`;
-            document.getElementById('areaAvg').textContent = `≈ ${Math.round(currentData.area / 3600)}W avg`;
+            document.getElementById('maxWorkValue').textContent = `${(currentData.maxWork1h / 1000).toFixed(0)}kJ`;
+            document.getElementById('maxWorkAvg').textContent = `≈ ${Math.round(currentData.maxWork1h / 3600)}W snitt`;
 
             const p1w = Number(document.getElementById('point1Watts').value);
             const p1s = Number(document.getElementById('point1Seconds').value);
