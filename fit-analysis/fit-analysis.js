@@ -1400,21 +1400,13 @@ function updateTSSConfig(key, property, value) {
     if (TSS_CONFIGS[key]) {
         TSS_CONFIGS[key][property] = value;
 
-        // Update display key based on seconds
+        // displayKey är identifieraren resultaten slås upp med och måste därför
+        // härledas ur fönsterlängden (FA-7). Den gamla formen avrundade till hela
+        // minuter, så 90 s och 120 s blev båda '2Minute' och skrev över varandra.
+        // Med w${seconds} betyder lika nyckel lika fönsterlängd, alltså samma
+        // korrekta värde - kollisionen är omöjlig att göra fel.
         if (property === 'seconds') {
-            const minutes = Math.round(value / 60);
-            const hours = Math.round(value / 3600);
-            let displayKey;
-
-            if (value < 60) {
-                displayKey = `${value}Second`;
-            } else if (value < 3600) {
-                displayKey = `${minutes}Minute`;
-            } else {
-                displayKey = `${hours}Hour`;
-            }
-
-            TSS_CONFIGS[key].displayKey = displayKey;
+            TSS_CONFIGS[key].displayKey = `w${value}`;
         }
 
         console.log('TSS Config updated:', key, property, value);
@@ -1453,9 +1445,9 @@ function addNewTSSConfig() {
 
     TSS_CONFIGS[newKey] = {
         seconds: newSeconds,
-        displayKey: '1Minute',
+        displayKey: `w${newSeconds}`,
         elementId: `tss${newKey}`,
-        label: '1m TSS (Custom)',
+        label: `TSS@${newSeconds}s`,
         chartColor: '#9C27B0',
         chartBackground: '#f3e5f5'
     };
