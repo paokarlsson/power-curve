@@ -296,6 +296,7 @@ function recalculateTSS(powerRecords, ftp) {
             minutes: Math.round(tssData.duration / 60),
             hours: Math.round(tssData.duration / 3600 * 10) / 10
         },
+        cleaning: tssData.cleaning,
         windows: {}
     };
 
@@ -353,7 +354,9 @@ function plotData(hrRecords, powerRecords, ftp) {
         const startTime = new Date(powerRecords[0].timestamp);
         const powerData = powerRecords.map(r => ({
             t: (new Date(r.timestamp) - startTime) / 1000, // seconds from start
-            p: r.power || 0
+            p: r.power || 0,
+            cadence: r.cadence,   // avgör om en nolla är bortfall eller frihjulning
+            speed: r.speed
         }));
 
         // Get current power exponent from input
@@ -369,6 +372,7 @@ function plotData(hrRecords, powerRecords, ftp) {
                 minutes: Math.round(tssData.duration / 60),
                 hours: Math.round(tssData.duration / 3600 * 10) / 10
             },
+            cleaning: tssData.cleaning,
             windows: {}
         };
 
@@ -742,6 +746,7 @@ function updateStats(hrRecords, powerRecords, timestamps, tssResults) {
     // TSS stats
     if (tssResults) {
         updateTSSDisplayValues(tssResults);
+        updateCleaningNote(tssResults.cleaning);
         document.getElementById('tssStats').style.display = 'grid';
     } else {
         // Clear all TSS values when no results available
@@ -749,6 +754,7 @@ function updateStats(hrRecords, powerRecords, timestamps, tssResults) {
             updateElementText(TSS_CONFIGS[windowType].elementId, '--');
         });
         updateElementText('tssSpread', '--');
+        updateCleaningNote(null);
         document.getElementById('tssStats').style.display = 'none';
     }
 }
@@ -823,6 +829,37 @@ function readVariabilitySpread(spread) {
 
 // Uppdatera samtliga TSS-rutor plus spridningen. Både omräkningen och
 // statistikpanelen går genom den här, så de kan inte glida ifrån varandra.
+// Säg vad koden gjorde med nollorna. Tolkningen är hela poängen med FA-1: en
+// frihjulad nolla och ett sensorbortfall ser identiska ut i effektserien, och
+// valet mellan dem flyttar TSS.
+function updateCleaningNote(cleaning) {
+    const note = document.getElementById('cleaningNote');
+    if (!note) return;
+
+    if (!cleaning) {
+        note.textContent = '';
+        return;
+    }
+
+    const parts = [];
+    if (cleaning.interpolated > 0) {
+        parts.push(`${cleaning.interpolated} nollor tolkade som sensorbortfall och interpolerade`);
+    }
+    if (cleaning.zerosKept > 0) {
+        parts.push(`${cleaning.zerosKept} nollor behållna som data (frihjulning eller stillastående)`);
+    }
+    if (parts.length === 0) {
+        note.textContent = 'Inga nollvärden i filen.';
+        return;
+    }
+
+    const source = cleaning.cadenceDecided > 0
+        ? `${cleaning.cadenceDecided} av dem avgjorda med kadens ur filen`
+        : 'ingen kadenskanal i filen, så isolerade nollor räknas som bortfall och serier som frihjulning';
+
+    note.textContent = `Nollvärden: ${parts.join(', ')} – ${source}.`;
+}
+
 function updateTSSDisplayValues(tssResults) {
     Object.keys(TSS_CONFIGS).forEach(windowType => {
         updateTSSElement(windowType, tssResults);
@@ -861,6 +898,43 @@ function updateTSSElement(windowType, tssResults) {
     updateElementText(config.elementId, value);
 }
 
+// Noll watt betyder tre olika saker, och effektserien ensam kan inte skilja dem
+// (FA-1). Kadensen kan:
+//
+//   0 W, kadens > 0  -> sensorbortfall: man trampar men mätaren registrerar inte
+//   0 W, kadens = 0  -> frihjulning eller stillastående: en äkta nolla
+//
+// Båda kanalerna finns i FIT-filen. Saknas kadens - CSV-import, eller en fil utan
+// kadensgivare - faller koden tillbaka på den gamla regeln: interpolera isolerade
+// nollor, behåll serier.
+function isSensorDropout(point) {
+    if (typeof point.cadence !== 'number') return null;
+    return point.cadence > 0;
+}
+
+// Linjär interpolation mellan närmaste positiva effekt före och efter.
+function interpolatePower(points, index) {
+    let before = null;
+    let after = null;
+
+    for (let i = index - 1; i >= 0; i--) {
+        if (points[i].p > 0) { before = points[i]; break; }
+    }
+    for (let i = index + 1; i < points.length; i++) {
+        if (points[i].p > 0) { after = points[i]; break; }
+    }
+
+    if (before && after) {
+        const span = after.t - before.t;
+        const share = span > 0 ? (points[index].t - before.t) / span : 0.5;
+        return before.p + (after.p - before.p) * share;
+    }
+
+    if (before) return before.p;
+    if (after) return after.p;
+    return 0;
+}
+
 // Robust data cleaning for interval training power data
 function cleanPowerData(rawPowerData) {
     console.log('🔧 Cleaning power data:', rawPowerData.length, 'points');
@@ -878,40 +952,44 @@ function cleanPowerData(rawPowerData) {
         }
     }
 
-    // Step 2: Interpolate isolated zeros - de är sannolikt sensorbortfall, eftersom
-    // effekten är positiv både före och efter. Sammanhängande nollor lämnas som de
-    // är: på cykel är de nästan alltid frihjulning, och noll är då korrekt uppmätt
-    // data (FA-1). Ett golv på 30 W uppfann effekt som aldrig trampades, och felet
-    // växte med frihjulningen - upp till +54 % TSS - så det gick inte att kalibrera
-    // bort. Att skilja äkta bortfall från frihjulning kräver kadens och hastighet,
-    // som finns i FIT-filen men inte läses in.
-    const cleaned = [];
+    // Step 2: Skilj sensorbortfall från äkta nollor, med kadens när den finns
+    const cleaned = deduped.map(point => ({ ...point }));
     let interpolated = 0;
-    let trueZeros = 0;
+    let zerosKept = 0;
+    let cadenceDecided = 0;
 
-    for (let i = 0; i < deduped.length; i++) {
-        const current = deduped[i];
+    for (let i = 0; i < cleaned.length; i++) {
+        if (cleaned[i].p !== 0) continue;
 
-        if (current.p === 0) {
+        const dropout = isSensorDropout(cleaned[i]);
+        let treatAsDropout;
+
+        if (dropout === null) {
+            // Ingen kadenskanal: bara isolerade nollor är sannolika bortfall
             const prevPower = i > 0 ? deduped[i - 1].p : 0;
             const nextPower = i < deduped.length - 1 ? deduped[i + 1].p : 0;
-
-            if (prevPower > 0 && nextPower > 0) {
-                // Interpolate isolated zeros
-                interpolated++;
-                cleaned.push({ ...current, p: (prevPower + nextPower) / 2 });
-            } else {
-                // Sammanhängande nolla: behåll den, den är data
-                trueZeros++;
-                cleaned.push(current);
-            }
+            treatAsDropout = prevPower > 0 && nextPower > 0;
         } else {
-            cleaned.push(current);
+            treatAsDropout = dropout;
+            cadenceDecided++;
+        }
+
+        if (treatAsDropout) {
+            cleaned[i].p = interpolatePower(deduped, i);
+            interpolated++;
+        } else {
+            zerosKept++;
         }
     }
 
-    console.log(`🔧 Cleaned: ${sortedData.length} → ${deduped.length} → ${cleaned.length} points, ${interpolated} isolated zeros interpolated, ${trueZeros} zeros kept as data`);
-    return cleaned;
+    console.log(`🔧 Cleaned: ${sortedData.length} → ${deduped.length} points, ${interpolated} zeros interpolated as dropouts, ${zerosKept} kept as data (${cadenceDecided} decided by cadence)`);
+
+    return {
+        points: cleaned,
+        interpolated: interpolated,
+        zerosKept: zerosKept,
+        cadenceDecided: cadenceDecided
+    };
 }
 
 // Mediansamplingsintervallet, alltså hur tätt filen faktiskt spelar in.
@@ -966,7 +1044,8 @@ function computeNP_by_time(rawPowerData, ftp, windowSecondsList = TSS_WINDOW_SEC
     if (!rawPowerData || rawPowerData.length < 2) throw new Error("Behöver minst två datapunkter med tidsstämplar.");
 
     // Clean the data first, then put it on a 1 Hz grid
-    const cleanedData = cleanPowerData(rawPowerData);
+    const cleaning = cleanPowerData(rawPowerData);
+    const cleanedData = cleaning.points;
     const powerData = resampleTo1Hz(cleanedData);
 
     if (powerData.length < 2) throw new Error("Behöver minst två datapunkter med tidsstämplar.");
@@ -1012,6 +1091,7 @@ function computeNP_by_time(rawPowerData, ftp, windowSecondsList = TSS_WINDOW_SEC
         firstTs,
         lastTs,
         sourceSamplingHz,
+        cleaning,
         windows: {}
     };
 
@@ -1337,6 +1417,7 @@ function calculateWorkoutTSS(workout) {
             minutes: Math.round(tssData.duration / 60),
             hours: Math.round(tssData.duration / 3600 * 10) / 10
         },
+        cleaning: tssData.cleaning,
         windows: {}
     };
 
