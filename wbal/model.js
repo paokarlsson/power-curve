@@ -168,47 +168,83 @@ function simulateWorkout(template, power, CP, W_prime, restPower) {
     }
 }
 
+// Sökintervall och bottenmarginal. 0,5 × CP ligger under CP, där ingenting töms
+// och min(W'bal) = W'; 4,0 × CP är högt nog att inte klippa tyst (WB-2).
+// Marginalen är docs/12 §2:s förslag på 2 % av W'.
+const SEARCH_LOW = 0.5;
+const SEARCH_HIGH = 4.0;
+const FLOOR_MARGIN = 0.02;
+
+// Halveringssökning på ett monotont villkor. predicate(lower) måste vara falskt
+// och predicate(upper) sant. Returnerar den högsta effekt där det är falskt,
+// vilket gör svaret säkert för hårda krav som bottennivån.
+function bisect(predicate, lower, upper) {
+    let low = lower;
+    let high = upper;
+
+    for (let i = 0; i < 60; i++) {
+        const middle = (low + high) / 2;
+        if (predicate(middle)) {
+            high = middle;
+        } else {
+            low = middle;
+        }
+    }
+
+    return low;
+}
+
 function calculateWorkout(template, CP, W_prime, targetWbal) {
     const restPower = CP * template.restPercent;
     const tau = deriveTau(CP, restPower);
+    const floorMargin = W_prime * FLOOR_MARGIN;
+    const lower = CP * SEARCH_LOW;
+    const upper = CP * SEARCH_HIGH;
+    const outcomeAt = power => simulateWorkout(template, power, CP, W_prime, restPower);
 
-    // Binary search for optimal power
-    let minPower = CP * 1.05;
-    let maxPower = CP * 1.50;
-    let optimalPower = (minPower + maxPower) / 2;
+    // Två skilda villkor (WB-1): doseringen är det sökningen optimerar mot,
+    // bottennivån är ett hårt krav som kan begränsa den.
+    let status = 'solved';
+    let power = null;
+    let solutionPower = null;
 
-    for (let i = 0; i < 30; i++) {
-        const finalWbal = simulateWorkout(template, optimalPower, CP, W_prime, restPower).finalWbal;
+    if (outcomeAt(upper).finalWbal > targetWbal) {
+        // Inte ens 4 × CP tömmer ner till målet - klipp inte tyst, säg det.
+        status = 'out_of_range';
+    } else {
+        solutionPower = bisect(p => outcomeAt(p).finalWbal <= targetWbal, lower, upper);
 
-        if (Math.abs(finalWbal - targetWbal) < 100) {
-            break;
+        if (outcomeAt(solutionPower).minWbal < floorMargin) {
+            status = 'floor_limited';
+            solutionPower = bisect(p => outcomeAt(p).minWbal < floorMargin, lower, solutionPower);
         }
 
-        if (finalWbal > targetWbal) {
-            minPower = optimalPower;
-        } else {
-            maxPower = optimalPower;
+        // Avrunda aldrig upp genom marginalen: en halv watt över ett långt intervall
+        // räcker för att äta upp den, och det är heltalet som faktiskt föreskrivs.
+        power = Math.round(solutionPower);
+        if (outcomeAt(power).minWbal < floorMargin) {
+            power = Math.floor(solutionPower);
         }
-
-        optimalPower = (minPower + maxPower) / 2;
     }
 
     // Calculate total work time and duration
     const stats = calculateWorkoutStats(template);
 
-    // Utfallet mäts på den oavrundade effekten - det är den siffran
-    // docs/12-omskrivning-wbal.md tabellerar.
-    const outcome = simulateWorkout(template, optimalPower, CP, W_prime, restPower);
+    // Utfallet mäts på lösningen, oavrundad där doseringen bestämmer den - det är
+    // den siffran docs/12-omskrivning-wbal.md tabellerar.
+    const outcome = solutionPower === null ? null : outcomeAt(solutionPower);
 
     return {
         name: template.name,
         type: template.type,
-        power: Math.round(optimalPower),
-        percentage: Math.round(optimalPower / CP * 100),
+        status: status,
+        power: power,
+        percentage: solutionPower === null ? null : Math.round(solutionPower / CP * 100),
         restPower: Math.round(restPower),
         tau: tau,
-        finalWbal: outcome.finalWbal,
-        minWbal: outcome.minWbal,
+        finalWbal: outcome === null ? null : outcome.finalWbal,
+        minWbal: outcome === null ? null : outcome.minWbal,
+        targetWbal: targetWbal,
         template: template,
         stats: stats
     };
@@ -267,6 +303,7 @@ if (typeof module !== 'undefined' && module.exports) {
         workoutTemplates,
         deriveTau,
         calculateWPrimeRecovery,
+        bisect,
         simulateWorkout,
         calculateWorkout,
         calculateWorkoutStats,

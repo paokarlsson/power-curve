@@ -149,11 +149,56 @@ test('aktiv vila på halva CP återvinner mer än 50 % av underskottet', () => {
     assert.ok(recovered / W_PRIME > 0.5, `fick ${(recovered / W_PRIME * 100).toFixed(2)} %`);
 });
 
-test('solvern håller sig inom sitt sökintervall', () => {
+test('solvern håller sig inom sitt sökintervall och rapporterar ett känt tillstånd', () => {
     for (const workout of model.calculateAllWorkouts(CP, W_PRIME, TARGET_WBAL)) {
-        assert.ok(workout.power >= Math.round(CP * 1.05), `${workout.name}: ${workout.power} W`);
-        assert.ok(workout.power <= Math.round(CP * 1.50), `${workout.name}: ${workout.power} W`);
+        assert.ok(['solved', 'floor_limited', 'out_of_range'].includes(workout.status), workout.status);
+        if (workout.status === 'out_of_range') {
+            continue;
+        }
+        assert.ok(workout.power >= CP * 0.5, `${workout.name}: ${workout.power} W`);
+        assert.ok(workout.power <= CP * 4.0, `${workout.name}: ${workout.power} W`);
     }
+});
+
+test('varje föreskriven effekt lämnar bottennivån över noll', () => {
+    // Test 3 i docs/12 §Regressionstest, mätt på den heltalseffekt som visas.
+    for (const workout of model.calculateAllWorkouts(CP, W_PRIME, TARGET_WBAL)) {
+        assert.notEqual(workout.status, 'out_of_range', workout.name);
+        const outcome = simulateAt(workout.template, workout.power);
+        assert.ok(outcome.minWbal > 0, `${workout.name} vid ${workout.power} W: ${outcome.minWbal} J`);
+    }
+});
+
+test('2x15 min är en genomförbar lösning, inte ett klippt gränsvärde', () => {
+    // Test 4 i docs/12 §Regressionstest: idag −155 J, klippt mot undre gränsen
+    // 1,05 × CP. Watttalet låses i snapshotten nedan.
+    const workout = model.calculateAllWorkouts(CP, W_PRIME, TARGET_WBAL).find(w => w.name === '2×15 min');
+    assert.equal(workout.status, 'solved');
+    assert.ok(workout.minWbal > 0, `min ${workout.minWbal} J`);
+});
+
+test('bottennivån biter i det konstruerade fallet', () => {
+    // Test 6 i docs/12 §Regressionstest, och det enda fall som faktiskt kan fallera
+    // på golvvillkoret: CP 425 W, W' 5 kJ, mål 10 %. Doseringsmålet nås bara genom
+    // att bottennivån går ner till 39 J mot marginalen 100 J.
+    const template = templateByName('Pyramid 2-4-6-4-2');
+    const workout = model.calculateWorkout(template, 425, 5000, 500);
+
+    assert.equal(workout.status, 'floor_limited');
+    assert.ok(workout.minWbal >= 5000 * 0.02, `min ${workout.minWbal} J`);
+    assert.ok(workout.finalWbal > workout.targetWbal, `slut ${workout.finalWbal} J mot mål ${workout.targetWbal} J`);
+});
+
+test('out_of_range visas aldrig som en vanlig rekommendation', () => {
+    // Test 8 i docs/12 §Regressionstest. Ett pass som är för kort för att tömma ner
+    // till målet ens vid 4 × CP får ingen effektsiffra alls.
+    const tooEasy = { name: '1×10s', reps: 1, work: 10, rest: 60, restPercent: 0.5, type: 'anaerobic' };
+    const workout = model.calculateWorkout(tooEasy, CP, W_PRIME, TARGET_WBAL);
+
+    assert.equal(workout.status, 'out_of_range');
+    assert.equal(workout.power, null);
+    assert.equal(workout.percentage, null);
+    assert.equal(workout.minWbal, null);
 });
 
 // ---------------------------------------------------------------------------

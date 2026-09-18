@@ -158,6 +158,25 @@ button:hover {
     margin: 10px 0;
 }
 
+.power-recommendation.floor_limited {
+    background: linear-gradient(145deg, #c47f00, #e0a030);
+}
+
+.power-recommendation.no-solution {
+    background: linear-gradient(145deg, #555, #666);
+    padding: 20px 15px;
+}
+
+.status-note {
+    background: #3a2d10;
+    border-left: 3px solid #e0a030;
+    padding: 8px 10px;
+    margin: 0 0 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
 .power-value {
     font-size: 36px;
     font-weight: bold;

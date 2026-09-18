@@ -81,10 +81,24 @@ function displayResults(workouts, CP, W_prime, targetWbalPercent) {
                 <span class="workout-type ${workout.type}">${workout.type}</span>
                 <h3>${workout.name}</h3>
 
-                <div class="power-recommendation">
+                ${workout.status === 'out_of_range' ? `
+                <div class="power-recommendation no-solution">
+                    <div style="font-size: 18px; font-weight: bold;">Ingen lösning</div>
+                    <div style="font-size: 13px;">inte ens 4 × CP tömmer ner till mål-W'bal</div>
+                </div>
+                ` : `
+                <div class="power-recommendation ${workout.status}">
                     <div class="power-value">${workout.power}W</div>
                     <div style="font-size: 14px;">${workout.percentage}% av CP</div>
                 </div>
+                `}
+
+                ${workout.status === 'floor_limited' ? `
+                <div class="status-note">
+                    Begränsad av bottennivån, inte av mål-W'bal: slut-W'bal blir
+                    ${Math.round(workout.finalWbal)} J mot målet ${Math.round(workout.targetWbal)} J.
+                </div>
+                ` : ''}
 
                 <div class="result-detail">
                     <span class="result-label">Struktur:</span>
@@ -110,10 +124,12 @@ function displayResults(workouts, CP, W_prime, targetWbalPercent) {
                     <span class="result-value">${Math.round(workout.tau)}s</span>
                 </div>
 
+                ${workout.minWbal === null ? '' : `
                 <div class="result-detail">
                     <span class="result-label">Lägsta W'bal i passet:</span>
                     <span class="result-value">${Math.round(workout.minWbal)} J (${Math.round(workout.minWbal / W_prime * 100)}% av W')</span>
                 </div>
+                `}
 
                 <div class="result-detail">
                     <span class="result-label">Total arbetstid:</span>
