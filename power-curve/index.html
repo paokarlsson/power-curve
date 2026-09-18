@@ -12,38 +12,12 @@
         <h1 class="text-3xl font-bold mb-6 text-center">Power Curve Plotter</h1>
 
         <!-- Input controls -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div class="bg-gray-800 p-4 rounded-lg">
-                <h3 class="text-lg font-semibold mb-3 text-yellow-400">📍 Punkt 1</h3>
-                <div class="space-y-3">
-                    <div>
-                        <label class="block text-sm text-gray-300 mb-1">Watt</label>
-                        <input id="point1Watts" type="number" value="260"
-                               class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-yellow-500 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-sm text-gray-300 mb-1">Sekunder</label>
-                        <input id="point1Seconds" type="number" value="210"
-                               class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-yellow-500 focus:outline-none">
-                    </div>
-                </div>
-            </div>
+        <div id="pointsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-3"></div>
 
-            <div class="bg-gray-800 p-4 rounded-lg">
-                <h3 class="text-lg font-semibold mb-3 text-blue-400">📍 Punkt 2</h3>
-                <div class="space-y-3">
-                    <div>
-                        <label class="block text-sm text-gray-300 mb-1">Watt</label>
-                        <input id="point2Watts" type="number" value="220"
-                               class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-sm text-gray-300 mb-1">Sekunder</label>
-                        <input id="point2Seconds" type="number" value="630"
-                               class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none">
-                    </div>
-                </div>
-            </div>
+        <div class="flex flex-wrap gap-3 items-center mb-6 text-sm">
+            <button id="addPointButton" onclick="addPoint()"
+                    class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded border border-gray-600">+ Lägg till testpunkt</button>
+            <span class="text-gray-400">2–5 punkter. Tre eller fler ger en residual, och residualen är det som avslöjar ett dåligt test.</span>
         </div>
 
         <!-- Meddelanden om indata -->
@@ -54,7 +28,7 @@
             <div class="bg-gradient-to-br from-red-600 to-red-700 p-4 rounded-lg text-center">
                 <div class="text-sm text-red-200 mb-1">Högsta testeffekt</div>
                 <div id="maxTestPowerValue" class="text-2xl lg:text-3xl font-bold">–</div>
-                <div class="text-xs text-red-200 mt-1">den högre av dina två insatser</div>
+                <div class="text-xs text-red-200 mt-1">den högsta av dina insatser</div>
             </div>
             <div class="bg-gradient-to-br from-orange-600 to-orange-700 p-4 rounded-lg text-center">
                 <div class="text-sm text-orange-200 mb-1">HIE (High Intensity Energy)</div>
@@ -73,6 +47,9 @@
                 <div id="maxWorkAvg" class="text-xs text-purple-200 mt-1">–</div>
             </div>
         </div>
+
+        <!-- Residualer -->
+        <div id="residuals" class="bg-gray-800 p-4 rounded-lg mb-6 text-sm"></div>
 
         <!-- Charts -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -104,16 +81,113 @@
             <p class="mt-2">• <span class="text-yellow-400">Känslighet:</span> två punkter ger exakt en lösning, alltså
                 ingen residual och ingen konfidens. Spannen ovan visar hur mycket <span id="errorHint">–</span> mätfel på
                 testpunkterna flyttar skattningen - den tredje värdesiffran är fiktion.</p>
-            <p class="mt-3 text-white"><strong>🧪 Testprotokoll:</strong> använd <strong>två maximala insatser mellan 3 och 12 minuter</strong>,
-                med <strong>minst 3 minuters skillnad</strong> i längd. Verktygets defaultvärden, 210 s och 630 s, ligger mitt i
-                modellens giltiga domän. Kortare insatser än ~2 minuter domineras av neuromuskulär effekt som modellen inte
-                beskriver, och blåser upp HIE; ligger testtiderna nära varandra svänger TP kraftigt av små mätfel.</p>
+            <p class="mt-3 text-white"><strong>🧪 Testprotokoll:</strong> använd <strong>tre maximala insatser mellan 2 och 15 minuter</strong>,
+                väl spridda i längd - defaultvärdena 3, 5 och 12 minuter är protokollets egna. Kortare insatser än ~2 minuter
+                domineras av neuromuskulär effekt som modellen inte beskriver och blåser upp HIE; längre än ~15 minuter drar TP nedåt.
+                Två punkter fungerar, men ger ingen residual och därmed ingen möjlighet att upptäcka ett dåligt test - då gäller i
+                stället kravet på minst 3 minuters skillnad i längd.</p>
         </div>
     </div>
 
     <script>
         let powerChart, workChart;
-        let currentData = { tp: 0, hie: 0, maxTestPower: 0, maxWork1h: 0, tpSpan: 0, hieSpan: 0 };
+        let currentData = { tp: 0, hie: 0, maxTestPower: 0, maxWork1h: 0, tpSpan: 0, hieSpan: 0, residuals: [] };
+
+        // Minimivarianten ur docs/11-effekt-duration-protokoll.md §10: tre punkter i
+        // 2-15 min ger CP, W' och en residual, vilket är allt som behövs för zoner
+        // och intervallplanering. Defaultvärdena är dokumentets genomräknade
+        // exempel. Två punkter fungerar som specialfall, men ger ingen residual -
+        // och det är den enda delen av protokollet som är gratis.
+        let points = [
+            { watts: 330, seconds: 180 },
+            { watts: 300, seconds: 300 },
+            { watts: 265, seconds: 720 }
+        ];
+
+        const MIN_POINTS = 2;
+        const MAX_POINTS = 5;
+        const MAX_RESIDUAL = 8; // W, docs/11 §5: över detta ska passet göras om
+
+        const POINT_COLORS = ['yellow', 'blue', 'green', 'pink', 'indigo'];
+
+        function renderPoints() {
+            const grid = document.getElementById('pointsGrid');
+            grid.innerHTML = points.map((point, index) => {
+                const color = POINT_COLORS[index % POINT_COLORS.length];
+                return `
+                <div class="bg-gray-800 p-4 rounded-lg">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-lg font-semibold text-${color}-400">📍 Punkt ${index + 1}</h3>
+                        ${points.length > MIN_POINTS ? `<button onclick="removePoint(${index})"
+                            class="text-xs text-gray-400 hover:text-red-400">ta bort</button>` : ''}
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-sm text-gray-300 mb-1">Watt</label>
+                            <input type="number" value="${point.watts}" oninput="updatePoint(${index}, 'watts', this.value)"
+                                   class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-${color}-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-300 mb-1">Sekunder</label>
+                            <input type="number" value="${point.seconds}" oninput="updatePoint(${index}, 'seconds', this.value)"
+                                   class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-${color}-500 focus:outline-none">
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            document.getElementById('addPointButton').disabled = points.length >= MAX_POINTS;
+            document.getElementById('addPointButton').classList.toggle('opacity-40', points.length >= MAX_POINTS);
+        }
+
+        function updatePoint(index, field, value) {
+            points[index][field] = Number(value);
+            calculateCurve();
+        }
+
+        function addPoint() {
+            if (points.length >= MAX_POINTS) return;
+            const last = points[points.length - 1];
+            points.push({ watts: Math.round(last.watts * 0.95), seconds: Math.round(last.seconds * 1.5) });
+            renderPoints();
+            calculateCurve();
+        }
+
+        function removePoint(index) {
+            if (points.length <= MIN_POINTS) return;
+            points.splice(index, 1);
+            renderPoints();
+            calculateCurve();
+        }
+
+        // Anpassa P mot 1/t med minsta kvadrat, aldrig W mot t: W = P·t har t på
+        // båda sidor, vilket ger ett falskt högt R² och residualer i joule som
+        // låter långa tester dominera. Med P mot 1/t blir mittengrenen linjär,
+        // P = CP + W'·x med x = 1/t, och residualerna blir watt - direkt tolkbara.
+        // Två punkter ger samma svar som algebran, men utan nämnare som kan bli noll.
+        function fitPowerDuration(testPoints) {
+            const xs = testPoints.map(point => 1 / point.seconds);
+            const ps = testPoints.map(point => point.watts);
+            const mean = values => values.reduce((a, b) => a + b, 0) / values.length;
+            const xMean = mean(xs);
+            const pMean = mean(ps);
+
+            let sxy = 0;
+            let sxx = 0;
+            xs.forEach((x, i) => {
+                sxy += (x - xMean) * (ps[i] - pMean);
+                sxx += (x - xMean) * (x - xMean);
+            });
+
+            const hie = sxy / sxx;
+            const tp = pMean - hie * xMean;
+
+            return {
+                tp: tp,
+                hie: hie,
+                residuals: testPoints.map((point, i) => point.watts - (tp + hie * xs[i]))
+            };
+        }
 
         // Två punkter ger exakt en lösning, alltid: ingen residual, ingen
         // konfidensskattning, ingen möjlighet att upptäcka att en insats var dålig
@@ -125,28 +199,29 @@
             return `${Math.round(seconds)}s`;
         }
 
-        function signatureFrom(P1, t1, P2, t2) {
-            const tp = (P1 * t1 - P2 * t2) / (t1 - t2);
-            return { tp: tp, hie: (P1 - tp) * t1 };
-        }
+
 
         // TP är lutningen mellan två punkter i arbete–tid-planet, så en liten
         // vertikal störning svänger lutningen - desto mer ju närmare punkterna
         // ligger på tidsaxeln. Samma geometri som gör ett långt sikte mer precist
         // än ett kort. Här prövas ±5 W på båda punkterna.
-        function sensitivity(P1, t1, P2, t2) {
+        function sensitivity(testPoints) {
             let tpMin = Infinity, tpMax = -Infinity;
             let hieMin = Infinity, hieMax = -Infinity;
 
-            [-MEASUREMENT_ERROR, MEASUREMENT_ERROR].forEach(e1 => {
-                [-MEASUREMENT_ERROR, MEASUREMENT_ERROR].forEach(e2 => {
-                    const signature = signatureFrom(P1 + e1, t1, P2 + e2, t2);
-                    tpMin = Math.min(tpMin, signature.tp);
-                    tpMax = Math.max(tpMax, signature.tp);
-                    hieMin = Math.min(hieMin, signature.hie);
-                    hieMax = Math.max(hieMax, signature.hie);
-                });
-            });
+            // Varje kombination av ±5 W på samtliga punkter, alltså 2^n hörn
+            const corners = Math.pow(2, testPoints.length);
+            for (let mask = 0; mask < corners; mask++) {
+                const shifted = testPoints.map((point, i) => ({
+                    seconds: point.seconds,
+                    watts: point.watts + ((mask >> i) & 1 ? MEASUREMENT_ERROR : -MEASUREMENT_ERROR)
+                }));
+                const fit = fitPowerDuration(shifted);
+                tpMin = Math.min(tpMin, fit.tp);
+                tpMax = Math.max(tpMax, fit.tp);
+                hieMin = Math.min(hieMin, fit.hie);
+                hieMax = Math.max(hieMax, fit.hie);
+            }
 
             return { tp: (tpMax - tpMin) / 2, hie: (hieMax - hieMin) / 2 };
         }
@@ -174,65 +249,61 @@
         }
 
         function calculateCurve() {
-            const point1Watts = Number(document.getElementById('point1Watts').value);
-            const point1Seconds = Number(document.getElementById('point1Seconds').value);
-            const point2Watts = Number(document.getElementById('point2Watts').value);
-            const point2Seconds = Number(document.getElementById('point2Seconds').value);
-
-            const t1 = point1Seconds;
-            const t2 = point2Seconds;
-            const P1 = point1Watts;
-            const P2 = point2Watts;
-
-            // Modellen behöver två skilda punkter på tidsaxeln för att kunna bestämma en
-            // lutning; två punkter på samma tid definierar ingen linje (PC-3). Samma
-            // kontroll som running/index.html gör före sin beräkning.
-            if (P1 <= 0 || t1 <= 0 || P2 <= 0 || t2 <= 0) {
-                showMessage('<strong>Ofullständig inmatning.</strong> Effekt och tid måste vara positiva tal för båda testerna.');
+            if (points.some(point => point.watts <= 0 || point.seconds <= 0 || !isFinite(point.watts) || !isFinite(point.seconds))) {
+                showMessage('<strong>Ofullständig inmatning.</strong> Effekt och tid måste vara positiva tal för varje testpunkt.');
                 blankSignature();
                 return;
             }
 
-            if (t1 === t2) {
-                showMessage('<strong>Testerna måste ha olika längd.</strong> Modellen bestämmer TP ur lutningen mellan två punkter i arbete–tid-planet, och två insatser på samma tid definierar ingen lutning. Ändra den ena testtiden.');
+            // Minstakvadratanpassningen har ingen t₁ − t₂ i någon nämnare, men kravet
+            // på skilda tider finns kvar: alla punkter på samma tid ger ingen lutning,
+            // och då blir Σ(x − x̄)² noll (PC-3).
+            const distinctTimes = new Set(points.map(point => point.seconds)).size;
+            if (distinctTimes < 2) {
+                showMessage('<strong>Testerna måste ha olika längd.</strong> Modellen bestämmer TP ur lutningen mellan punkterna i effekt–1/tid-planet, och punkter på samma tid definierar ingen lutning. Ändra någon testtid.');
                 blankSignature();
                 return;
             }
 
             clearMessage();
 
-            const signature = signatureFrom(P1, t1, P2, t2);
-            const CP = signature.tp;
-            const Wprime = signature.hie;
+            const fit = fitPowerDuration(points);
+            const CP = fit.tp;
+            const Wprime = fit.hie;
 
-            // Negativ HIE är modellens enda inbyggda kvalitetskontroll (PC-4): den
-            // korta insatsen gav mindre totalt arbete än den långa, vilket är
-            // fysiologiskt omöjligt om båda var maximala. Visa tolkningen, inte talet.
+            // Negativ HIE är modellens enda inbyggda kvalitetskontroll (PC-4): de
+            // korta insatserna gav mindre totalt arbete än de långa, vilket är
+            // fysiologiskt omöjligt om alla var maximala. Visa tolkningen, inte talet.
             if (Wprime <= 0) {
                 showMessage(`<strong>Negativ HIE – testpunkterna är inkonsekventa.</strong>
-                    Den korta insatsen gav mindre totalt arbete än den långa, vilket betyder att
+                    De korta insatserna gav mindre totalt arbete än de långa, vilket betyder att
                     minst ett av testerna inte var maximalt: antingen sparade du dig i det korta
                     eller pressade dig ovanligt hårt i det långa.
-                    Beräkningen ger TP ${Math.round(CP)} W och HIE ${Math.round(Wprime)} J.
+                    Anpassningen ger TP ${Math.round(CP)} W och HIE ${Math.round(Wprime)} J.
                     Gör om det test du tror var svagast.`);
                 blankSignature();
                 return;
             }
 
             // Tvåparametersmodellen har ingen peak power - kurvan divergerar när t → 0.
-            // Rutan visar bara den högre av de två inmatade effekterna (PC-2).
-            const maxTestPower = Math.max(P1, P2);
+            // Rutan visar bara den högsta inmatade effekten (PC-2).
+            const maxTestPower = Math.max(...points.map(point => point.watts));
 
             // Känsligheten först, den behövs både i rutorna och i varningen
-            const span = sensitivity(P1, t1, P2, t2);
-            const separation = Math.abs(t1 - t2);
+            const span = sensitivity(points);
 
-            if (separation < MIN_SEPARATION) {
-                showMessage(`<strong>Testtiderna ligger bara ${Math.round(separation)} s ifrån varandra.</strong>
-                    TP är lutningen mellan två punkter i arbete–tid-planet, så ju närmare punkterna ligger på
-                    tidsaxeln desto mer svänger skattningen av ett litet mätfel: här flyttar
-                    ${MEASUREMENT_ERROR} W fel TP ±${Math.round(span.tp)} W och HIE
-                    ±${(span.hie / 1000).toFixed(1)} kJ. Använd två insatser med minst tre minuters skillnad i längd.`);
+            // Separationsvarningen gäller tvåpunktsfallet: där finns ingen residual
+            // som kan avslöja problemet (PC-5). Med tre punkter tar residualen över
+            // som diagnostik, och punkterna ska i stället vara spridda i 1/t.
+            if (points.length === 2) {
+                const separation = Math.abs(points[0].seconds - points[1].seconds);
+                if (separation < MIN_SEPARATION) {
+                    showMessage(`<strong>Testtiderna ligger bara ${Math.round(separation)} s ifrån varandra.</strong>
+                        TP är lutningen mellan punkterna, så ju närmare de ligger på tidsaxeln desto mer svänger
+                        skattningen av ett litet mätfel: här flyttar ${MEASUREMENT_ERROR} W fel TP
+                        ±${Math.round(span.tp)} W och HIE ±${(span.hie / 1000).toFixed(1)} kJ.
+                        Använd minst tre minuters skillnad i längd - eller lägg till en tredje punkt, som ger en residual.`);
+                }
             }
 
             // Modellen är formulerad i arbete: W(t) = TP · t + HIE. Frågan "hur mycket
@@ -247,7 +318,8 @@
                 maxTestPower: Math.round(maxTestPower),
                 maxWork1h: maxWork1h,
                 tpSpan: span.tp,
-                hieSpan: span.hie
+                hieSpan: span.hie,
+                residuals: fit.residuals
             };
 
             updateDisplayValues();
@@ -277,25 +349,18 @@
         }
 
         function updatePointInfo() {
-            const p1w = Number(document.getElementById('point1Watts').value);
-            const p1s = Number(document.getElementById('point1Seconds').value);
-            const p2w = Number(document.getElementById('point2Watts').value);
-            const p2s = Number(document.getElementById('point2Seconds').value);
-
-            document.getElementById('pointInfo').innerHTML = `
-                <p>• <span class="text-yellow-400">Punkt 1:</span> ${p1w}W @ ${p1s}s = ${((p1w * p1s) / 1000).toFixed(1)}kJ (${p1w * p1s}J)</p>
-                <p>• <span class="text-blue-400">Punkt 2:</span> ${p2w}W @ ${p2s}s = ${((p2w * p2s) / 1000).toFixed(1)}kJ (${p2w * p2s}J)</p>
-            `;
+            document.getElementById('pointInfo').innerHTML = points.map((point, index) => {
+                const color = POINT_COLORS[index % POINT_COLORS.length];
+                const work = point.watts * point.seconds;
+                return `<p>• <span class="text-${color}-400">Punkt ${index + 1}:</span> ${point.watts}W @ ${point.seconds}s
+                        = ${(work / 1000).toFixed(1)}kJ (${work}J)</p>`;
+            }).join('');
         }
 
         function updateCharts() {
-            const p1w = Number(document.getElementById('point1Watts').value);
-            const p1s = Number(document.getElementById('point1Seconds').value);
-            const p2w = Number(document.getElementById('point2Watts').value);
-            const p2s = Number(document.getElementById('point2Seconds').value);
-
-            const minTime = Math.min(p1s, p2s);
-            const maxTime = Math.max(p1s, p2s);
+            const seconds = points.map(point => point.seconds);
+            const minTime = Math.min(...seconds);
+            const maxTime = Math.max(...seconds);
 
             const powerData = [];
             const powerLabels = [];
@@ -337,18 +402,6 @@
 
             const ctx = document.getElementById('powerChart');
             if (!ctx) return;
-
-            // Generate scatter data for line chart
-            const lineData = [];
-            for (let i = 0; i < labels.length; i++) {
-                lineData.push({ x: i, y: data[i] });
-            }
-
-            // Add input points
-            const p1w = Number(document.getElementById('point1Watts').value);
-            const p1s = Number(document.getElementById('point1Seconds').value);
-            const p2w = Number(document.getElementById('point2Watts').value);
-            const p2s = Number(document.getElementById('point2Seconds').value);
 
             powerChart = new Chart(ctx, {
                 type: 'line',
@@ -461,19 +514,15 @@
             });
         }
 
-        // Event listeners
-        document.getElementById('point1Watts').addEventListener('input', calculateCurve);
-        document.getElementById('point1Seconds').addEventListener('input', calculateCurve);
-        document.getElementById('point2Watts').addEventListener('input', calculateCurve);
-        document.getElementById('point2Seconds').addEventListener('input', calculateCurve);
-
         // Initialize
         window.addEventListener('load', function() {
             console.log('Page loaded, running initial calculation');
+            renderPoints();
             calculateCurve();
         });
 
         // Also run immediately
+        renderPoints();
         calculateCurve();
     </script>
 </body>
