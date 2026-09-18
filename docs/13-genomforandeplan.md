@@ -21,7 +21,7 @@ ett fattat beslut — inte som något som ska vägas igen.
 **Ja — nio.** Två skäl, och bara det första är tvingande.
 
 **Tvingande — [12](12-omskrivning-wbal.md) kräver det.** Steg 1–3 sänker föreskriven effekt
-med 1–12 W; steg 4 (CP/FTP) höjer varje siffra med exakt 10,5 W. Släpps de ihop tar de ut
+med 1–12 W; steg 4 (CP/FTP) höjer varje siffra med ~10,5 W. Släpps de ihop tar de ut
 varandra och **ingendera går att verifiera**. [12 §Ordning](12-omskrivning-wbal.md) säger
 det rakt ut: *"Släpp steg 4 separat."* Det är en releasegräns, inte en granskningspreferens.
 
@@ -194,7 +194,7 @@ Egen release. Nettoeffekten blir annars ungefär noll för de korta passen
 | # | Commit | Åtgärdar | Grönt av |
 |---|---|---|---|
 | 3.1 | Döp om fältet `index.html:17` till `CP (Critical Power)`. Explicit FTP-inmatning konverteras med `CP ≈ FTP / 0,95` och märks som uppskattad. | [WB-5](09-fel-wbal.md) | Test: FTP 200 W inmatat ger exakt samma siffror som CP 210,5 W |
-| 3.2 | Uppdatera snapshot: varje mall +10,5 W vid FTP-inmatning. | [WB-5](09-fel-wbal.md) | Förskjutningen är **identisk för alla mallar** — ett enda tal, inte 19 |
+| 3.2 | Uppdatera snapshot: varje mall ~+10,5 W vid FTP-inmatning. | [WB-5](09-fel-wbal.md) | Förskjutningen är **nästan** ett enda tal: +10,56 till +10,96 W, avrundat +10 eller +11 W. Se [12 §4 [Justerat]](12-omskrivning-wbal.md) — härledd τ gör den CP-beroende |
 
 ### PR 4 — `power-curve/`: de fem billiga
 

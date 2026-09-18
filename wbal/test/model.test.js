@@ -299,16 +299,71 @@ const EFTER = [
     ['2×15 min', 208, 104, 4500]
 ];
 
-test('alla 19 mallar ger kolumnen "Efter" på defaultvärden', () => {
-    const workouts = model.calculateAllWorkouts(CP, W_PRIME, TARGET_WBAL);
-    assert.equal(workouts.length, EFTER.length);
+// FTP 200 W inmatat, alltså CP = 200 / 0,95 = 210,53 W, W' 15 kJ, mål 30 %.
+// Samma kolumner som EFTER. Se docs/12 §4 [Justerat] för förskjutningen.
+const EFTER_FTP = [
+    ['4×4 min', 228, 108, 4500],
+    ['5×5 min', 223, 106, 4500],
+    ['6×3 min', 227, 108, 4500],
+    ['8×2 min', 229, 109, 4500],
+    ['3×8 min', 221, 105, 4500],
+    ['4×6 min', 222, 105, 4500],
+    ['2×10 min', 222, 105, 4500],
+    ['10×90s', 229, 109, 4500],
+    ['12×1 min', 237, 113, 4500],
+    ['15×1 min', 231, 110, 4500],
+    ['20×30s', 241, 114, 4500],
+    ['12×45s', 242, 115, 4500],
+    ['10×1 min', 246, 117, 4500],
+    ['3×(10×40s)', 229, 109, 4500],
+    ['Pyramid 1-2-3-4-3-2-1', 226, 107, 4215],
+    ['Pyramid 2-4-6-4-2', 226, 107, 3981],
+    ['5×(2min + 1min)', 229, 109, 4500],
+    ['4×(3min + 2min)', 224, 106, 4500],
+    ['2×15 min', 218, 104, 4500]
+];
 
-    for (let i = 0; i < EFTER.length; i++) {
-        const [name, power, percentage, minWbal] = EFTER[i];
+function assertSnapshot(workouts, expected) {
+    assert.equal(workouts.length, expected.length);
+
+    for (let i = 0; i < expected.length; i++) {
+        const [name, power, percentage, minWbal] = expected[i];
         assert.equal(workouts[i].name, name, `mall ${i} heter ${workouts[i].name}`);
         assert.equal(workouts[i].status, 'solved', `${name}: tillstånd`);
         assert.equal(workouts[i].power, power, `${name}: effekt`);
         assert.equal(workouts[i].percentage, percentage, `${name}: procent av CP`);
         assert.equal(Math.round(workouts[i].minWbal), minWbal, `${name}: min(W'bal)`);
     }
+}
+
+test('alla 19 mallar ger kolumnen "Efter" på defaultvärden', () => {
+    assertSnapshot(model.calculateAllWorkouts(CP, W_PRIME, TARGET_WBAL), EFTER);
+});
+
+test('FTP-inmatning förskjuter hela tabellen uppåt', () => {
+    assertSnapshot(model.calculateAllWorkouts(model.cpFromFtp(200), W_PRIME, TARGET_WBAL), EFTER_FTP);
+});
+
+test('förskjutningen vid FTP-inmatning är nästan ett enda tal', () => {
+    // docs/12 §4 [Justerat]: planen sa exakt +10,5 W för alla mallar. Efter steg 1
+    // är τ härledd ur D_CP = CP · (1 − restPercent) och sjunker alltså när CP
+    // stiger, vilket ger något snabbare återhämtning och något mer än det rena
+    // skiftet. Mätt spann +10,56 till +10,96 W mot ΔCP = 10,53 W.
+    const deltaCP = model.cpFromFtp(200) - 200;
+    const base = model.calculateAllWorkouts(200, W_PRIME, TARGET_WBAL);
+    const shifted = model.calculateAllWorkouts(model.cpFromFtp(200), W_PRIME, TARGET_WBAL);
+
+    let lowest = Infinity;
+    let highest = -Infinity;
+
+    for (let i = 0; i < base.length; i++) {
+        const shift = shifted[i].solutionPower - base[i].solutionPower;
+        assert.ok(shift > deltaCP, `${base[i].name}: ${shift.toFixed(3)} W är inte över ΔCP`);
+        lowest = Math.min(lowest, shift);
+        highest = Math.max(highest, shift);
+    }
+
+    assert.equal(lowest.toFixed(2), '10.56');
+    assert.equal(highest.toFixed(2), '10.96');
+    assert.ok(highest - lowest < 0.5, `spridningen ${(highest - lowest).toFixed(3)} W är för stor`);
 });

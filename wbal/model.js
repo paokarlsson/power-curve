@@ -249,6 +249,7 @@ function calculateWorkout(template, CP, W_prime, targetWbal) {
         status: status,
         power: power,
         percentage: solutionPower === null ? null : Math.round(solutionPower / CP * 100),
+        solutionPower: solutionPower,
         restPower: Math.round(restPower),
         tau: tau,
         finalWbal: outcome === null ? null : outcome.finalWbal,
