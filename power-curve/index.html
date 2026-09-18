@@ -46,8 +46,11 @@
             </div>
         </div>
 
+        <!-- Meddelanden om indata -->
+        <div id="message" class="hidden mb-6 bg-yellow-900 bg-opacity-40 border-l-4 border-yellow-500 p-4 rounded-lg text-sm"></div>
+
         <!-- Fitness Signature -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div id="signature" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div class="bg-gradient-to-br from-red-600 to-red-700 p-4 rounded-lg text-center">
                 <div class="text-sm text-red-200 mb-1">PP (Peak Power)</div>
                 <div id="ppValue" class="text-2xl lg:text-3xl font-bold">400W</div>
@@ -84,7 +87,7 @@
             </div>
         </div>
 
-        <div class="mt-6 bg-gray-800 p-4 rounded-lg text-sm text-gray-300">
+        <div id="explanation" class="mt-6 bg-gray-800 p-4 rounded-lg text-sm text-gray-300">
             <p class="font-semibold text-white mb-2">📊 Critical Power Model - Två perspektiv</p>
             <p class="mb-2"><strong>Power vs Duration (vänster):</strong> Hyperbolisk kurva <span class="text-blue-400 font-mono">P(t) = TP + HIE/t</span></p>
             <p class="mb-3"><strong>Work vs Duration (höger):</strong> Linjär kurva <span class="text-purple-400 font-mono">W(t) = TP × t + HIE</span></p>
@@ -106,6 +109,26 @@
             return `${Math.round(seconds)}s`;
         }
 
+        function showMessage(html) {
+            const box = document.getElementById('message');
+            box.innerHTML = html;
+            box.classList.remove('hidden');
+        }
+
+        function clearMessage() {
+            const box = document.getElementById('message');
+            box.textContent = '';
+            box.classList.add('hidden');
+        }
+
+        // Inga siffror alls hellre än siffror som inte hör ihop med inmatningen.
+        function blankSignature() {
+            const ids = ['ppValue', 'hieValue', 'hieJoule', 'tpValue', 'areaValue', 'areaAvg'];
+            ids.forEach(id => {
+                document.getElementById(id).textContent = '–';
+            });
+        }
+
         function calculateCurve() {
             const point1Watts = Number(document.getElementById('point1Watts').value);
             const point1Seconds = Number(document.getElementById('point1Seconds').value);
@@ -116,6 +139,23 @@
             const t2 = point2Seconds;
             const P1 = point1Watts;
             const P2 = point2Watts;
+
+            // Modellen behöver två skilda punkter på tidsaxeln för att kunna bestämma en
+            // lutning; två punkter på samma tid definierar ingen linje (PC-3). Samma
+            // kontroll som running/index.html gör före sin beräkning.
+            if (P1 <= 0 || t1 <= 0 || P2 <= 0 || t2 <= 0) {
+                showMessage('<strong>Ofullständig inmatning.</strong> Effekt och tid måste vara positiva tal för båda testerna.');
+                blankSignature();
+                return;
+            }
+
+            if (t1 === t2) {
+                showMessage('<strong>Testerna måste ha olika längd.</strong> Modellen bestämmer TP ur lutningen mellan två punkter i arbete–tid-planet, och två insatser på samma tid definierar ingen lutning. Ändra den ena testtiden.');
+                blankSignature();
+                return;
+            }
+
+            clearMessage();
 
             const CP = (P1 * t1 - P2 * t2) / (t1 - t2);
             const Wprime = (P1 - CP) * t1;
