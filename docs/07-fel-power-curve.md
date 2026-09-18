@@ -315,6 +315,14 @@ Ett verktyg som räknar rätt men tiger om osäkerheten inbjuder till övertro. 
 ## Koppling till övriga verktyg
 
 `TP` och `HIE` från detta verktyg är **exakt** de `CP` och `W′` som
-[`wbal/`](09-fel-wbal.md) efterfrågar. Att verktygen inte delar värden är en av orsakerna
-till felet [WB-5](09-fel-wbal.md) (CP och FTP behandlas som samma sak). Ett gemensamt
-signaturvärde skulle åtgärda båda.
+[`wbal/`](09-fel-wbal.md) efterfrågar. Att verktygen inte delade värden var en av orsakerna
+till felet [WB-5](09-fel-wbal.md) (CP och FTP behandlades som samma sak).
+
+**Åtgärdat.** Verktygen delar numera en atletprofil (`athlete-profile.js`): `TP` och `HIE`
+skrivs hit som `CP` och `W′` vid varje giltig anpassning, och `wbal/` och `fit-analysis/`
+läser dem därifrån. Profilen lagrar en enda storhet per fält - CP, aldrig FTP - så
+omräkningen görs på ett ställe i stället för i varje verktyg. `running/` skriver `CS` och
+`D′` till samma profil.
+
+Lagringen är webbläsarens `localStorage`: per dator och per webbläsare, inget skickas
+någonstans. Utan lagring faller varje verktyg tillbaka på sina egna defaultvärden.

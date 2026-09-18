@@ -6,6 +6,7 @@
     <title>Power Curve Plotter</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="../athlete-profile.js"></script>
 </head>
 <body class="bg-gradient-to-br from-gray-900 to-gray-800 text-white min-h-screen">
     <div class="container mx-auto p-6">
@@ -47,6 +48,9 @@
                 <div id="maxWorkAvg" class="text-xs text-purple-200 mt-1">–</div>
             </div>
         </div>
+
+        <!-- Atletprofil -->
+        <div id="profileNote" class="mb-6 bg-gray-800 p-4 rounded-lg text-sm text-gray-300"></div>
 
         <!-- Residualer -->
         <div id="residuals" class="bg-gray-800 p-4 rounded-lg mb-6 text-sm"></div>
@@ -98,11 +102,18 @@
         // och intervallplanering. Defaultvärdena är dokumentets genomräknade
         // exempel. Två punkter fungerar som specialfall, men ger ingen residual -
         // och det är den enda delen av protokollet som är gratis.
-        let points = [
+        const DEFAULT_POINTS = [
             { watts: 330, seconds: 180 },
             { watts: 300, seconds: 300 },
             { watts: 265, seconds: 720 }
         ];
+
+        // Testpunkterna sparas i atletprofilen tillsammans med TP och HIE, inte
+        // bara signaturen. Utan dem skulle en omladdning återgå till
+        // defaultpunkterna, räkna om, och skriva över en profil som användaren
+        // just satt i ett annat verktyg med dokumentets exempelvärden.
+        let points = (AthleteProfile.load().powerTests || DEFAULT_POINTS)
+            .map(point => ({ watts: point.watts, seconds: point.seconds }));
 
         const MIN_POINTS = 2;
         const MAX_POINTS = 5;
@@ -246,6 +257,9 @@
                 document.getElementById(id).textContent = '–';
             });
             document.getElementById('residuals').innerHTML = '';
+            document.getElementById('profileNote').innerHTML =
+                `<p class="font-semibold text-white mb-1">Atletprofil</p>
+                 <p class="text-gray-400">Ingen giltig anpassning - profilen lämnas orörd.</p>`;
             updatePointInfo();
         }
 
@@ -323,8 +337,48 @@
                 residuals: fit.residuals
             };
 
+            // TP och HIE är exakt de CP och W' som wbal/ och fit-analysis/ vill ha.
+            // Verktyget är signaturens källa, så profilen skrivs vid varje giltig
+            // anpassning - inte bakom en knapp som går att glömma.
+            const saved = AthleteProfile.save({ cp: CP, wPrime: Wprime, powerTests: points });
+            showProfileNote(saved);
+
             updateDisplayValues();
             updateCharts();
+        }
+
+        // Profilen ligger i webbläsarens localStorage: per dator och per webbläsare,
+        // inget skickas någonstans. Går den inte att skriva till - privat läge,
+        // avstängd lagring - fungerar verktyget precis som förut, men värdena
+        // följer inte med till de andra verktygen. Det ska synas.
+        function showProfileNote(saved) {
+            const note = document.getElementById('profileNote');
+
+            // Negativ HIE fångas tidigare, men negativ TP gör det inte: anpassningen
+            // kan ge en lutning under noll utan att vara orimlig i modellens mening.
+            // Profilen tar bara positiva tal, så fältet faller bort - och då ska
+            // notisen säga det, inte visa NaN.
+            if (saved && (saved.cp === undefined || saved.wPrime === undefined)) {
+                note.innerHTML = `<p class="font-semibold text-white mb-1">Atletprofil</p>
+                    <p class="text-yellow-400">Anpassningen gav inte både ett positivt TP och ett positivt HIE,
+                    så signaturen sparas inte. Testpunkterna är sparade.</p>`;
+                return;
+            }
+
+            if (!saved) {
+                note.innerHTML = `<p class="font-semibold text-white mb-1">Atletprofil</p>
+                    <p class="text-yellow-400">Webbläsaren tillåter inte lagring, så TP och HIE kan inte delas med
+                    <a href="../wbal/" class="underline">Intervall Optimizer</a> eller
+                    <a href="../fit-analysis/" class="underline">FIT-analysen</a>. Skriv in dem för hand där.</p>`;
+                return;
+            }
+
+            note.innerHTML = `<p class="font-semibold text-white mb-1">Atletprofil</p>
+                <p>TP ${Math.round(saved.cp)} W och HIE ${(saved.wPrime / 1000).toFixed(1)} kJ är sparade som
+                CP och W' i den gemensamma atletprofilen, tillsammans med testpunkterna.
+                <a href="../wbal/" class="underline text-blue-400">Intervall Optimizer</a> och
+                <a href="../fit-analysis/" class="underline text-blue-400">FIT-analysen</a> använder dem direkt.
+                Profilen ligger i den här webbläsaren - inget skickas någonstans.</p>`;
         }
 
         function updateDisplayValues() {

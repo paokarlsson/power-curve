@@ -284,6 +284,7 @@
             }
         }
     </style>
+    <script src="../athlete-profile.js"></script>
 </head>
 <body>
     <div class="container">
@@ -392,6 +393,7 @@
             <p id="csInfo">• CS: -</p>
             <p id="dprimeInfo">• D': -</p>
             <p id="sensitivityInfo">• Känslighet: -</p>
+            <p id="profileInfo">• Atletprofil: -</p>
         </div>
     </div>
 
@@ -402,6 +404,17 @@
         const r1TimeInput = document.getElementById('r1Time');
         const r2DistInput = document.getElementById('r2Dist');
         const r2TimeInput = document.getElementById('r2Time');
+
+        // Loppen sparas i atletprofilen tillsammans med CS och D'. Utan dem skulle
+        // en omladdning återgå till defaultloppen, räkna om, och skriva över en
+        // profil som användaren just satt med verktygets exempelvärden.
+        const savedRunTests = AthleteProfile.load().runTests;
+        if (savedRunTests) {
+            r1DistInput.value = savedRunTests.d1;
+            r1TimeInput.value = savedRunTests.t1;
+            r2DistInput.value = savedRunTests.d2;
+            r2TimeInput.value = savedRunTests.t2;
+        }
 
         // Add event listeners
         r1DistInput.addEventListener('input', calculate);
@@ -482,6 +495,7 @@
                 document.getElementById(id).textContent = '-';
             });
             document.getElementById('predictionGrid').innerHTML = '';
+            blankProfileInfo();
         }
 
         function calculate() {
@@ -557,6 +571,17 @@
                     clearMessage();
                 }
 
+                // CS och D' är löpningens halva av signaturen. Profilen skrivs vid
+                // varje giltig beräkning, på samma sätt som power-curve/ skriver CP
+                // och W'. D' kan bli negativt om punkt 1 är oproportionerligt långsam,
+                // och profilen tar bara positiva värden - då sparas loppen ändå, så
+                // att inmatningen överlever en omladdning.
+                showProfileInfo(AthleteProfile.save({
+                    cs: CS,
+                    dPrime: Dprime,
+                    runTests: { d1: d1, t1: t1, d2: d2, t2: t2 }
+                }));
+
                 // Generate predictions
                 generatePredictions(CS, Dprime);
 
@@ -566,6 +591,40 @@
             } catch (error) {
                 console.error('Error in calculate:', error);
             }
+        }
+
+        // Profilen ligger i webbläsarens localStorage: per dator och per webbläsare,
+        // inget skickas någonstans. Går den inte att skriva till - privat läge,
+        // avstängd lagring - fungerar verktyget precis som förut, men värdena delas
+        // inte. Löpsignaturen har i dagsläget ingen konsument bland de andra
+        // verktygen; den sparas för att profilen ska beskriva hela atleten.
+        function showProfileInfo(saved) {
+            const info = document.getElementById('profileInfo');
+
+            if (!saved) {
+                info.innerHTML = `• <span style="color: #FBBF24">Atletprofil:</span> kunde inte sparas -
+                    webbläsaren tillåter inte lagring. Verktyget fungerar ändå, men värdena delas inte.`;
+                return;
+            }
+
+            // Negativt D′ betyder att punkt 1 är oproportionerligt långsam - samma
+            // inkonsekvens som negativ HIE i power-curve/. CS och loppen sparas,
+            // men ett negativt D′ är ingen anaerob reserv och hör inte i profilen.
+            if (saved.dPrime === undefined) {
+                info.innerHTML = `• <span style="color: #FBBF24">Atletprofil:</span> CS och loppen är sparade,
+                    men D′ är negativt och sparas inte - punkt 1 är för långsam i förhållande till punkt 2 för
+                    att vara en maximal insats.`;
+                return;
+            }
+
+            info.innerHTML = `• <span style="color: #10B981">Atletprofil:</span> CS och D′ är sparade i den
+                gemensamma atletprofilen tillsammans med loppen. Profilen ligger i den här webbläsaren -
+                inget skickas någonstans.`;
+        }
+
+        function blankProfileInfo() {
+            document.getElementById('profileInfo').innerHTML =
+                '• <span style="color: #9CA3AF">Atletprofil:</span> ingen giltig beräkning - profilen lämnas orörd.';
         }
 
         // Vad markeringen betyder i respektive ände av domänen.

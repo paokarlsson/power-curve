@@ -204,7 +204,11 @@ liknande extrapolation av mallformatet.
 
 ## 7. CP eller FTP?
 
-Inmatningsfältet heter `CP (Critical Power / FTP)` och behandlar de två som utbytbara.
+**Åtgärdat, och därefter förenklat.** Fältet delades först upp i ett CP-värde och en
+källväljare för FTP; numera tar det bara CP, och FTP förekommer inte i något av verktygen.
+Avsnittet beskriver varför sammanblandningen var ett fel, inte hur verktyget ser ut idag.
+
+Inmatningsfältet hette `CP (Critical Power / FTP)` och behandlade de två som utbytbara.
 Det är de inte:
 
 - **FTP** definieras protokollmässigt, typiskt 95 % av ett 20-minuterstest.

@@ -120,6 +120,18 @@ input[type="file"] {
     margin-left: 8px;
 }
 
+.input-hint {
+    color: #666;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 6px 0 0;
+    max-width: 640px;
+}
+
+.input-hint a {
+    color: #1976d2;
+}
+
 /* TSS Configuration Panel */
 .config-panel {
     background: #f9f9f9;

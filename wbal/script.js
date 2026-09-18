@@ -1,21 +1,50 @@
-/* global calculateAllWorkouts, cpFromFtp */
+/* global AthleteProfile, calculateAllWorkouts */
 // Gränssnittet för Intervall Optimizer: läser inmatningen, anropar model.js och ritar
 // resultatet. All matematik ligger i model.js.
 
-function calculate() {
-    const enteredPower = parseFloat(document.getElementById('cp').value);
-    const enteredAsFtp = document.getElementById('cpSource').value === 'ftp';
+// Verktyget är signaturens konsument, inte dess källa: CP och W' mäts i
+// power-curve/ och hämtas härifrån om de finns. Inmatningen går fortfarande att
+// ändra för hand, och då skrivs profilen om - senaste värdet gäller.
+function loadProfileIntoInputs() {
+    const profile = AthleteProfile.load();
+    const note = document.getElementById('profileNote');
 
-    // WB-5: modellen vill ha CP. Matas FTP in konverteras det explicit och märks
-    // som uppskattat - det tas aldrig tyst för att vara samma storhet.
-    const CP = enteredAsFtp ? cpFromFtp(enteredPower) : enteredPower;
+    if (profile.cp === undefined && profile.wPrime === undefined) {
+        note.innerHTML = `Ingen atletprofil hittad - fälten visar standardvärden.
+            Mät CP och W&#39; i <a href="../power-curve/">Power Curve Plotter</a>,
+            så fylls de i här automatiskt.`;
+        return;
+    }
+
+    if (profile.cp !== undefined) {
+        document.getElementById('cp').value = Math.round(profile.cp);
+    }
+    if (profile.wPrime !== undefined) {
+        document.getElementById('wprime').value = (profile.wPrime / 1000).toFixed(1);
+    }
+
+    note.innerHTML = `Värdena kommer från den gemensamma atletprofilen
+        (<a href="../power-curve/">Power Curve Plotter</a>). Ändrar du dem här uppdateras profilen.`;
+}
+
+function calculate() {
+    // WB-5: modellen vill ha CP, och fältet tar bara CP. Ett FTP-värde ur ett
+    // 20-minuterstest är en annan storhet och räknas inte om här - mät CP i
+    // power-curve/ i stället.
+    const CP = parseFloat(document.getElementById('cp').value);
     const W_prime = parseFloat(document.getElementById('wprime').value) * 1000;
     const targetWbalPercent = parseFloat(document.getElementById('targetWbal').value) / 100;
     const targetWbal = W_prime * targetWbalPercent;
 
     const workouts = calculateAllWorkouts(CP, W_prime, targetWbal);
 
-    displayResults(workouts, CP, W_prime, targetWbalPercent, enteredAsFtp ? enteredPower : null);
+    // Ett tomt fält ger NaN, och profilen tar bara positiva tal - utan den här
+    // kontrollen skulle ett tomt fält radera ett mätt CP ur profilen.
+    if (CP > 0 && W_prime > 0) {
+        AthleteProfile.save({ cp: CP, wPrime: W_prime });
+    }
+
+    displayResults(workouts, CP, W_prime, targetWbalPercent);
 }
 
 function formatTime(seconds) {
@@ -38,7 +67,7 @@ function formatDuration(seconds) {
     return `${seconds}s`;
 }
 
-function displayResults(workouts, CP, W_prime, targetWbalPercent, ftp) {
+function displayResults(workouts, CP, W_prime, targetWbalPercent) {
     const resultsDiv = document.getElementById('results');
 
     // Summary card
@@ -46,7 +75,7 @@ function displayResults(workouts, CP, W_prime, targetWbalPercent, ftp) {
         <div class="summary-card">
             <h2>Din Fitness Signature</h2>
             <div class="result-detail">
-                <span class="result-label">${ftp === null ? 'CP:' : 'CP (uppskattad ur FTP):'}</span>
+                <span class="result-label">CP:</span>
                 <span class="result-value">${Number.isInteger(CP) ? CP : CP.toFixed(1).replace('.', ',')}W</span>
             </div>
             <div class="result-detail">
@@ -57,12 +86,6 @@ function displayResults(workouts, CP, W_prime, targetWbalPercent, ftp) {
                 <span class="result-label">Mål W'bal efter pass:</span>
                 <span class="result-value">${Math.round(targetWbalPercent * 100)}% (${Math.round(W_prime * targetWbalPercent)}J)</span>
             </div>
-            ${ftp === null ? '' : `
-            <p class="estimated-note">
-                Uppskattad ur FTP ${ftp}W med CP ≈ FTP / 0,95. Det är en tumregel, inte en
-                mätning - ett CP ur ett effekt-duration-test är alltid att föredra.
-            </p>
-            `}
         </div>
 
         <h2 style="color: #4CAF50; margin-bottom: 20px; text-align: center;">
@@ -166,5 +189,6 @@ function displayResults(workouts, CP, W_prime, targetWbalPercent, ftp) {
 
 // Auto-calculate on page load
 window.onload = function() {
+    loadProfileIntoInputs();
     calculate();
 };

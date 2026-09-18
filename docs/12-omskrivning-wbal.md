@@ -248,6 +248,12 @@ W′-förbrukningen överskattas i varje intervall.
 - Matas FTP in manuellt: konvertera explicit (`CP ≈ FTP / 0,95`) och märk värdet som
   uppskattat i gränssnittet.
 
+**Överspelad.** Steget genomfördes som beskrivet, med en källväljare och `cpFromFtp()`.
+Därefter togs FTP bort helt: fältet tar bara CP, `cpFromFtp()` finns inte längre i
+`model.js`, och CP hämtas i första hand ur atletprofilen. Mätningen nedan gäller fortfarande
+som beskrivning av felets storlek - den är bara inte längre något användaren kan råka ut
+för via gränssnittet.
+
 ### Storleken på felet  **[Justerat]**
 
 FTP 200 W inmatat som CP, mot korrekt CP = 200 / 0,95 = 210,5 W, W′ 15 kJ, mål 30 %:
