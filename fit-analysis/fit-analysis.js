@@ -16,39 +16,45 @@ const CONFIG = {
 // En standardinställning ska ha exakt en definition. Både initieringen och
 // resetTSSConfigs() läser härifrån, och kopierar vid tilldelning så att reset
 // verkligen återställer i stället för att dela referens (FA-9).
+// Fönsterlängden är ett lågpassfilter på effektsignalen: den väljer vilken
+// tidsskala av variabilitet som mäts, inte vilket energisystem som belastades.
+// Namnen är därför neutrala (FA-4) - ett 10-sekundersfönster ger en siffra även
+// på ett pass utan en enda sprint, och "TSS (Sprint)" inbjöd till slutsatsen att
+// siffran säger något om det anaeroba systemet. Ordnade efter fönsterlängd, så
+// spektrumet läses från kort till långt.
 const DEFAULT_TSS_CONFIGS = {
-    SPRINT: {
+    W10: {
         seconds: 10,
-        displayKey: 'tenSecond',
-        elementId: 'tssSprint',
-        label: 'TSS (Sprint)',
+        displayKey: 'w10',
+        elementId: 'tssW10',
+        label: 'TSS@10s',
         chartColor: '#f57c00',
         chartBackground: '#fff3e0'
     },
-    VO2_MAX: {
-        seconds: 180,
-        displayKey: 'threeMinute',
-        elementId: 'tssVo2Max',
-        label: 'TSS (VO2max)',
-        chartColor: '#388e3c',
-        chartBackground: '#e8f5e8'
-    },
-    THRESHOLD: {
-        seconds: 600,
-        displayKey: 'tenMinute',
-        elementId: 'tssThreshold',
-        label: 'TSS (Threshold)',
-        chartColor: '#1976d2',
-        chartBackground: '#e3f2fd'
-    },
-    STANDARD: {
-        seconds: 30, // Fixed 30-second standard
-        displayKey: 'standard',
-        elementId: 'tssStandard',
-        label: 'TSS (Standard)',
+    W30: {
+        seconds: 30, // Coggans standardfönster
+        displayKey: 'w30',
+        elementId: 'tssW30',
+        label: 'TSS@30s',
         chartColor: '#7b1fa2',
         chartBackground: '#f3e5f5',
         fixed: true // Cannot be edited or removed
+    },
+    W180: {
+        seconds: 180,
+        displayKey: 'w180',
+        elementId: 'tssW180',
+        label: 'TSS@180s',
+        chartColor: '#388e3c',
+        chartBackground: '#e8f5e8'
+    },
+    W600: {
+        seconds: 600,
+        displayKey: 'w600',
+        elementId: 'tssW600',
+        label: 'TSS@600s',
+        chartColor: '#1976d2',
+        chartBackground: '#e3f2fd'
     }
 };
 
@@ -595,7 +601,7 @@ function plotTSSAccumulation(tssData) {
                 data: tssData.timestamps.map((time, i) => ({ x: time, y: tssData[config.elementId][i] })),
                 borderColor: config.chartColor,
                 backgroundColor: hexToRgba(config.chartColor, 0.1),
-                borderWidth: windowType === 'SPRINT' ? 3 : 2,
+                borderWidth: 2,
                 tension: 0.4,
                 fill: false,
                 pointRadius: 0,
@@ -762,13 +768,10 @@ function updateTSSElement(windowType, tssResults) {
         available: windowData?.available
     });
 
-    // Generate fallback text for unavailable data
-    let fallbackText = '--';
-    if (windowType === 'BASE') {
-        fallbackText = '--'; // Base TSS always shows simple fallback
-    } else if (windowType !== 'SPRINT') {
-        fallbackText = `N/A (<${config.seconds / 60}m)`;
-    }
+    // Fallbacktext när fönstret inte kunde beräknas: passet är kortare än fönstret.
+    // Uttryckt i fönsterlängd i stället för i en nyckel, så den följer med när
+    // fönstren konfigureras om.
+    const fallbackText = config.seconds > 0 ? `N/A (<${config.seconds}s)` : '--';
 
     const value = windowData?.available ? windowData.tss.toFixed(1) : fallbackText;
     console.log(`Setting element ${config.elementId} to value: ${value}`);
