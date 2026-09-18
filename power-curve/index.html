@@ -245,6 +245,7 @@
             ids.forEach(id => {
                 document.getElementById(id).textContent = '–';
             });
+            document.getElementById('residuals').innerHTML = '';
             updatePointInfo();
         }
 
@@ -345,6 +346,7 @@
             document.getElementById('hieInline').textContent = `${(currentData.hie / 1000).toFixed(1)}kJ (±${(currentData.hieSpan / 1000).toFixed(1)}kJ)`;
             document.getElementById('maxWorkInline').textContent = `${(currentData.maxWork1h / 1000).toFixed(0)}kJ`;
 
+            updateResiduals();
             updatePointInfo();
         }
 
@@ -355,6 +357,58 @@
                 return `<p>• <span class="text-${color}-400">Punkt ${index + 1}:</span> ${point.watts}W @ ${point.seconds}s
                         = ${(work / 1000).toFixed(1)}kJ (${work}J)</p>`;
             }).join('');
+        }
+
+        // Residualen är det tvåpunktsmetoden aldrig kan ge: skillnaden mellan mätt
+        // effekt och anpassad linje, i watt. docs/11 §5 sätter gränsen vid 8 W -
+        // över det ska passet göras om. Regeln fångar haverier, inte slarv: ett
+        // 5-minuterstest som missats med 15 W passerar och kostar 5,5 W i CP.
+        function updateResiduals() {
+            const panel = document.getElementById('residuals');
+
+            if (points.length < 3) {
+                panel.innerHTML = `
+                    <p class="font-semibold text-white mb-1">Residualer</p>
+                    <p class="text-gray-400">Två punkter ger ingen residual – anpassningen går exakt genom båda,
+                    oavsett hur testerna gick. Lägg till en tredje punkt för att kunna upptäcka att en insats inte
+                    var maximal.</p>`;
+                return;
+            }
+
+            const residuals = currentData.residuals;
+            const maxResidual = Math.max(...residuals.map(Math.abs));
+            const worst = residuals.findIndex(value => Math.abs(value) === maxResidual);
+            const passes = maxResidual <= MAX_RESIDUAL;
+
+            panel.innerHTML = `
+                <p class="font-semibold text-white mb-2">Residualer – mätt effekt minus anpassad kurva</p>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
+                    ${points.map((point, index) => `
+                        <div class="bg-gray-900 rounded px-3 py-2">
+                            <div class="text-xs text-gray-400">${formatDuration(point.seconds)}</div>
+                            <div class="font-mono ${Math.abs(residuals[index]) > MAX_RESIDUAL ? 'text-red-400' : 'text-gray-200'}">
+                                ${residuals[index] >= 0 ? '+' : '−'}${Math.abs(residuals[index]).toFixed(1)} W
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <p class="${passes ? 'text-green-400' : 'text-red-400'}">
+                    ${passes
+                        ? `Största avvikelse ${maxResidual.toFixed(1)} W, under gränsen ${MAX_RESIDUAL} W – anpassningen håller.`
+                        : `Största avvikelse ${maxResidual.toFixed(1)} W ligger över gränsen ${MAX_RESIDUAL} W. Gör om testet på
+                           ${formatDuration(points[worst].seconds)} – det är den punkt som avviker mest, och avvikelsen betyder
+                           att insatsen inte var maximal eller att en annan var det.`}
+                </p>
+                <p class="text-gray-500 text-xs mt-2">Gränsen är ett grovt filter. För punktuppsättningen 3/5/12 min nås den
+                    först när mittpunkten ligger ~17 W fel; ett test som missats med 15 W passerar och kostar ändå 5,5 W i TP.</p>`;
+        }
+
+        function formatDuration(seconds) {
+            if (seconds >= 60) {
+                const minutes = seconds / 60;
+                return Number.isInteger(minutes) ? `${minutes} min` : `${minutes.toFixed(1)} min`;
+            }
+            return `${seconds}s`;
         }
 
         function updateCharts() {
