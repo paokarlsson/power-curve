@@ -207,7 +207,9 @@ TSS = (t/3600) · (NP/FTP)² · 100  ∝  t · t^(−1/2)  =  √t
 
 Kurvan växer alltså som **roten ur tiden, för alltid** — även om atleten stannar helt.
 
-**Uppmätt.** 3 min på 450 W, därefter 120 W. 120 W mot FTP 200 motsvarar 18 TSS/timme:
+**Uppmätt.** 3 min på 450 W, därefter 120 W. 120 W mot FTP 200 motsvarar
+**36 TSS/timme** — `(120/200)² · 100`. (Raden sa tidigare 18 TSS/timme, men tabellen nedan
+är räknad på 36: 10 min ger 6,0, en kvart 9,0 och en halvtimme 18,0.)
 
 | Period | Verktygets tillskott | Korrekt för perioden | Uppblåsning |
 |---|---|---|---|
