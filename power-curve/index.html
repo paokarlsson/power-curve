@@ -416,6 +416,7 @@
             const minTime = Math.min(...seconds);
             const maxTime = Math.max(...seconds);
 
+            const powerTimes = [];
             const powerData = [];
             const powerLabels = [];
 
@@ -427,9 +428,12 @@
                 const t = Math.pow(10, logTime);
                 const power = currentData.tp + currentData.hie / t;
 
+                powerTimes.push(t);
                 powerData.push(Math.round(power));
                 powerLabels.push(formatTime(Math.round(t)));
             }
+
+            const split = splitAtFittedRange(powerTimes, powerData, minTime, maxTime);
 
             const workData = [];
             const workLabels = [];
@@ -444,11 +448,31 @@
                 workLabels.push(Math.round(t));
             }
 
-            updatePowerChart(powerLabels, powerData);
+            updatePowerChart(powerLabels, split.fitted, split.extrapolated);
             updateWorkChart(workLabels, workData);
         }
 
-        function updatePowerChart(labels, data) {
+        // Heldraget där modellen är anpassad, streckat utanför. Extrapolationen är
+        // inte samma sak som en anpassning, och det ska synas: kurvan under
+        // kortaste testet saknar övre hastighetsgräns och över längsta testet ärver
+        // den hela domänfrågan. Randvärdena ligger i båda serierna så linjerna möts.
+        function splitAtFittedRange(times, values, minTime, maxTime) {
+            const fitted = times.map((t, i) => (t >= minTime && t <= maxTime ? values[i] : null));
+            const extrapolated = times.map((t, i) => (t < minTime || t > maxTime ? values[i] : null));
+
+            times.forEach((t, i) => {
+                const insideNow = fitted[i] !== null;
+                const insideBefore = i > 0 && fitted[i - 1] !== null;
+                if (insideNow !== insideBefore && i > 0) {
+                    // skarven: låt båda serierna innehålla punkten på var sin sida
+                    extrapolated[insideNow ? i : i - 1] = values[insideNow ? i : i - 1];
+                }
+            });
+
+            return { fitted, extrapolated };
+        }
+
+        function updatePowerChart(labels, fittedData, extrapolatedData) {
             if (powerChart) {
                 powerChart.destroy();
                 powerChart = null;
@@ -462,14 +486,25 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Power Curve',
-                        data: data,
+                        label: 'Anpassat intervall',
+                        data: fittedData,
                         borderColor: '#3B82F6',
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
                         borderWidth: 3,
                         fill: false,
                         tension: 0.4,
-                        pointRadius: 0
+                        pointRadius: 0,
+                        spanGaps: false
+                    }, {
+                        label: 'Extrapolation',
+                        data: extrapolatedData,
+                        borderColor: '#93C5FD',
+                        borderDash: [6, 4],
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        spanGaps: false
                     }, {
                         label: `TP: ${currentData.tp}W`,
                         data: new Array(labels.length).fill(currentData.tp),
